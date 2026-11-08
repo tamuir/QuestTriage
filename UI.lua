@@ -143,6 +143,10 @@ local function rowMenu(row)
     if row.loc then root:CreateButton("Show on map", function() pinRow(row) end) end
     if questID and C_QuestLog.GetLogIndexForQuestID(questID) then
       root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(questID) end)
+      -- Same check and call as Blizzard's objective tracker menu.
+      if IsInGroup() and C_QuestLog.IsPushableQuest(questID) then
+        root:CreateButton("Share with party", function() QuestUtil.ShareQuest(questID) end)
+      end
     end
     if row.retry and questID then
       root:CreateButton("Try it again now", function()

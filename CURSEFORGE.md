@@ -94,7 +94,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 
 - **Click a line:** map pin there, and the map opens.
 - **Shift-click a quest:** link it in chat.
-- **Right-click a line:** show on map, open in quest log, save for later (until a level you pick, or until you bring it back), hide, abandon (Drop list), try again.
+- **Right-click a line:** show on map, open in quest log, share with party, save for later (until a level you pick, or until you bring it back), hide, abandon (Drop list), try again.
 - **Click an Equip step:** puts the item on.
 
 Commands: `/qt` show or hide · `/qt options` settings · `/qt stats` your leveling stats · `/qt unhide` bring back hidden quests · `/qt reset` move the panel back · `/qt debug` explain every pin (for bug reports)
