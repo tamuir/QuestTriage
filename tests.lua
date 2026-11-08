@@ -105,6 +105,9 @@ assert(seedRow and seedRow.style == "item" and seedRow.icon == "blocker" and see
 assert(seedRow.loc == stone and seedRow.pin == "blocker", "the row points where to get the item, not at the altar")
 assert(seedRow.tip[1]:find("^First: Pick up Flawed Power Stone%. Click the Flawed Power Stone at Flawed Power Stone, The Barrens 47%.1, 12%.4"),
   seedRow.tip[1])
+local firsts = 0
+for _, line in ipairs(seedRow.tip) do if line:find("^First:") then firsts = firsts + 1 end end
+assert(firsts == 1, "the blocker is explained once, not twice")
 -- An item with no known source still says so, instead of pointing somewhere wrong.
 local lost = QT.Triage({ q{ title = "Odd", level = 12, questID = 9, loc = at(10, 0),
   blockers = { { text = "Get Strange Key", how = "Questie doesn't know where it comes from" } } } }, player)

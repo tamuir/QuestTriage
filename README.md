@@ -1,10 +1,51 @@
+<p align="center"><img src="media/logo-512.png" alt="Quest Triage logo: a glowing quest mark under a glass dome, set in brass gears with a compass" width="160"></p>
+
 # Quest Triage
 
 **Your leveling co-pilot for World of Warcraft: Forever.** Quest Triage looks at your quest log, your bags, your gear and where you're standing, and tells you the single best thing to do next, with an arrow pointing the way.
 
 No guide to read, no route to memorize. One card at the top of the panel says what to do now.
 
-![Quest Triage panel](media/logo-400.png)
+![Quest Triage in the Barrens: the Next card says to hand in The Stagnant Oasis to Tonga Runetotem, about 2 minutes north-west, worth 13% of a level, above the sorted quest lists](docs/images/next-step.jpg)
+
+## See it in action
+
+<table>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/images/batch-hub.jpg" alt="The Next card in a quest hub: Hand in Raptor Thieves to Gazrog, 2 more to do here">
+</td>
+<td width="50%" valign="top">
+
+**Clear a hub before you leave.** In Batch mode, the Next card walks you through everything nearby first: here, hand in Raptor Thieves to Gazrog, with "2 more to do here".
+
+**Everything sorted.** Turn in, Do now (grouped by zone, nearest first, with progress bars), Pick up, Needs a group, Save for later and Drop.
+
+**Hover anything** for the objectives, the reason and the exact location. Click to pin it on your map.
+
+</td>
+</tr>
+<tr>
+<td width="50%" valign="top">
+<img src="docs/images/pick-up.png" alt="The Next card: Pick up Apothecary Zamah from Apothecary Helbrim, under a minute north-west, with nearby quests to pick up listed below">
+
+**Never miss a quest.** Nearby quest givers worth your time, nearest first.
+</td>
+<td width="50%" valign="top">
+<img src="docs/images/gear.png" alt="The Next card: Equip Charger's Armor of Strength, +2 Strength and -8 Armor, already in your bags">
+
+**Get stronger.** Upgrades judged on real stats for your class, with the exact trade shown. One click to equip.
+</td>
+</tr>
+</table>
+
+![The world map with the Quest Triage pin's tooltip: The Demon Seed needs an item, first pick up a Flawed Power Stone at The Barrens 62.3, 20.0, about 3 minutes north-east, then complete The Demon Seed](docs/images/pin-tooltip.jpg)
+
+**Map pins that explain themselves.** Hover the pin for the step, what you need first and how to get it, exact coordinates and distance, and where to go after.
+
+![Quest Triage settings: leveling style Batch (fastest), lock panel position, sell gray items automatically, fade in combat, and panel size](docs/images/settings.png)
+
+**Simple settings** in the game's own Options window: Batch or one at a time, auto-sell grays, lock, size, combat fade.
 
 ## What it does
 

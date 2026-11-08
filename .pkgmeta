@@ -7,10 +7,14 @@ ignore:
   - pics
   - CURSEFORGE.md
   - README.md
-  - media/logo.svg
+  - media/logo-512.png
   - media/logo-400.png
+  - media/social-preview.png
+  - docs
+  - tools
   - .github
   - .gitignore
+  - .gitattributes
   - SECURITY.md
 
 manual-changelog:

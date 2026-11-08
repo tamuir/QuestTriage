@@ -1,0 +1,7 @@
+## Interface: 16001
+## Title: Quest Triage Shots
+## Notes: Developer tool, not part of Quest Triage: takes the screenshots for Quest Triage's README and CurseForge page.
+## Dependencies: QuestTriage
+## SavedVariables: QuestTriageShotsDB
+
+QuestTriageShots.lua

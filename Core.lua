@@ -754,7 +754,8 @@ function QT.BuildRows(buckets, player, power, opts, groups)
     local q = e.quest
     local tag = questTag(b.id, q, e.backAt)
     local tip = QT.Checklist(q) or {}
-    if e.reason ~= "" then table.insert(tip, e.reason) end
+    -- A blocked quest's reason is "First: …", which the blocker line below already says (with where and how).
+    if e.reason ~= "" and not (b.id == "now" and q.blockers and q.blockers[1]) then table.insert(tip, e.reason) end
     if q.xp and q.xp > 0 then table.insert(tip, commas(q.xp) .. " XP") end
     local loc = (b.id ~= "later" and b.id ~= "drop") and q.loc or nil
     local function place(l)
