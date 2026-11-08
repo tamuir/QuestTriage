@@ -1,5 +1,9 @@
 # Changelog
 
+## [Unreleased]
+
+- Save any quest for later from the right-click menu: until a level you pick (it comes back on its own) or until you bring it back with "Do it now".
+
 ## [0.5.0] - 2026-11-08
 
 - Death handling: release, run back to your corpse with the arrow, resurrect; the route resumes where you left off.

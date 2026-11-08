@@ -150,6 +150,23 @@ local function rowMenu(row)
         QT.Render()
       end)
     end
+    -- Your call: park a quest in Save for later until a level you pick, or until you bring it back.
+    if row.saved and questID then
+      root:CreateButton("Do it now", function()
+        QuestTriageCharDB.deferred[questID] = nil
+        QT.Render()
+      end)
+    elseif questID and C_QuestLog.GetLogIndexForQuestID(questID) and not row.drop and row.pin ~= "turnin" then
+      local back = math.max(UnitLevel("player") + 1, row.qlevel or 0)
+      local function save(untilLevel)
+        QuestTriageCharDB.deferred[questID] = { untilLevel = untilLevel }
+        local h = QuestTriageCharDB.history[questID]
+        if h then h.deferred = true end -- feedback: the player disagreed with the advice
+        QT.Render()
+      end
+      root:CreateButton(string.format("Save for later: until level %d", back), function() save(back) end)
+      root:CreateButton("Save for later: until I bring it back", function() save(nil) end)
+    end
     if questID then
       root:CreateButton("Hide from list", function()
         QuestTriageCharDB.hidden[questID] = true
@@ -282,6 +299,7 @@ local function layout(specs)
     r.kind, r.data, r.tip, r.loc, r.pin = s.kind, s.data, s.tip, s.loc, s.pin or s.icon
     r.questID, r.drop, r.yards, r.retry = s.questID, s.drop, s.yards or (s.loc and s.loc.yards), s.retry
     r.pinQuestID, r.thenLoc, r.thenTitle = s.pinQuestID, s.thenLoc, s.thenTitle
+    r.saved, r.qlevel = s.saved, s.qlevel
 
     local left = st.x
     if st.icon then
@@ -488,6 +506,11 @@ function QT.Render()
   for _, q in ipairs(QT.ReadQuestLog()) do
     if not (q.questID and hidden[q.questID]) then
       q.deaths = q.questID and QuestTriageCharDB.deaths[q.questID]
+      local df = q.questID and QuestTriageCharDB.deferred[q.questID]
+      if df and df.untilLevel and player.level >= df.untilLevel then
+        QuestTriageCharDB.deferred[q.questID], df = nil, nil -- reached the level: it comes back on its own
+      end
+      q.deferred = df
       if q.questID and not q.isComplete then trackProgress(q, now) end
       table.insert(quests, q)
     end
@@ -692,6 +715,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     QuestTriageCharDB.levels = QuestTriageCharDB.levels or {}
     QuestTriageCharDB.hidden = QuestTriageCharDB.hidden or {}
     QuestTriageCharDB.deaths = QuestTriageCharDB.deaths or {}
+    QuestTriageCharDB.deferred = QuestTriageCharDB.deferred or {}
     if QuestTriageDB.pos then
       local p = QuestTriageDB.pos
       self:ClearAllPoints()

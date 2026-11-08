@@ -274,6 +274,20 @@ assert(sa2[1].text == "Go do Nearby" and sa2[2].sub:find("do something nearby an
 local slowRows = QT.BuildRows(QT.Triage({ slowQ, other }, player), player, {}, { style = "single" })
 assert(has(slowRows, "Raptor Thieves.*slow"), "the list tags it slow")
 
+-- Saved for later by the player: stays there until the chosen level, or until brought back.
+local kolkar = q{ title = "Kolkar Leaders", level = 13, questID = 850, deferred = { untilLevel = 13 } }
+local kb, kr, kback = QT.Classify(kolkar, player)
+assert(kb == "later" and kback == 13 and kr:find("comes back at level 13"), kr)
+assert(QT.Classify(q{ title = "K2", level = 13, deferred = { untilLevel = 12 } }, player) == "now", "back once you reach the level")
+local kb2, kr2 = QT.Classify(q{ title = "K3", level = 12, deferred = {} }, player)
+assert(kb2 == "later" and kr2:find("Right%-click it to bring it back"), "saved with no level stays until brought back")
+assert(QT.Classify(q{ title = "K4", level = 12, isComplete = true, deferred = {} }, player) == "turnin", "a finished quest is still handed in")
+local kRows = QT.BuildRows(QT.Triage({ kolkar, q{ title = "K3", level = 12, questID = 851, deferred = {} } }, player),
+  player, {}, { expanded = { later = true } })
+local kRow, k3Row = has(kRows, "Kolkar Leaders"), has(kRows, "K3")
+assert(kRow.saved and kRow.qlevel == 13 and kRow.text:find("at level 13"), "saved row: offers Do it now, shows the level")
+assert(k3Row.saved and k3Row.text:find("saved"), "no level: tagged saved")
+
 -- Deaths: dying twice on a quest at your level moves it to Save for later, with the level to come back at.
 local died = q{ title = "Kreenig", level = 14, questID = 7, deaths = { count = 2, level = 12 } }
 local db, dr, dback = QT.Classify(died, player)

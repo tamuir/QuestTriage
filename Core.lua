@@ -48,6 +48,7 @@ end
 -- Decide the bucket and a one-line reason for one quest. An empty reason means "nothing worth saying".
 -- q: { title, level, questID, zone, isComplete, isFailed, suggestedGroup, tag, xp, upgrade, deaths, objectives = {{text, have, need}} }
 -- q.deaths (optional, recorded by UI.lua): { count, level } = how often you died doing it, at which level.
+-- q.deferred (optional, set by the player): { untilLevel = level it comes back at, or nil = until brought back }.
 -- player: { level, greenRange, zone }  greenRange = levels below you that still give decent XP
 -- Returns bucket, reason, and for "later" the level to come back at.
 QT.DEATHS_BEFORE_LATER = 2
@@ -66,6 +67,12 @@ local function classifyBase(q, player)
   -- Trust the game's own grey flag; level math is only the fallback.
   if q.isTrivial or (q.isTrivial == nil and ql < greyBelow) then
     return "drop", string.format("Grey for you (level %d). Almost no XP left.", ql)
+  end
+  -- You chose to save it for later: respect that until the level you picked (or until you bring it back).
+  local df = q.deferred
+  if df and (not df.untilLevel or pl < df.untilLevel) then
+    return "later", df.untilLevel and string.format("You saved this for later. It comes back at level %d.", df.untilLevel)
+      or "You saved this for later. Right-click it to bring it back.", df.untilLevel
   end
   -- Your own deaths are the best evidence: dying twice on it at this level means it's too hard right now.
   local dd = q.deaths
@@ -630,7 +637,7 @@ local function questTag(bucket, q, backAt)
     return q.isFailed and colored("ffff7a7a", "failed") or colored("ffb8b8b8", "grey")
   end
   if bucket == "later" then
-    return colored("ffffa060", "at level " .. (backAt or q.level or 0))
+    return colored("ffffa060", (backAt and ("at level " .. backAt)) or (q.deferred and "saved") or ("at level " .. (q.level or 0)))
   end
   local tags = {}
   if q.blockers and q.blockers[1] then table.insert(tags, colored("ffff7a7a", "needs item")) end
@@ -713,7 +720,7 @@ function QT.BuildRows(buckets, player, power, opts, groups)
     end
     add({ style = "hero", icon = a.icon, text = a.text, sub = #meta > 0 and table.concat(meta, "  ·  ") or nil,
       kind = a.kind, data = a.data, loc = a.loc, tip = a.tip, questID = a.questID, key = a.key, pinQuestID = a.pinQuestID, thenLoc = a.thenLoc, thenTitle = a.thenTitle, checklist = a.checklist,
-      yards = a.loc and a.loc.yards, here = a.here })
+      yards = a.loc and a.loc.yards, here = a.here, qlevel = a.qlevel })
   end
   local fight = opts.fight and QT.FightCheck(opts.fight, { level = player.level, manaPct = opts.manaPct })
   if fight then add({ style = "alert", icon = "blocker", text = fight }) end
@@ -780,7 +787,8 @@ function QT.BuildRows(buckets, player, power, opts, groups)
       right = (q.inArea and not blocker and loc) and "here" or QT.Short(loc), progress = (b.id == "now" or b.id == "group") and p > 0 and p or nil,
       kind = "quest", data = q.questID, questID = q.questID, loc = loc, tip = tip, drop = b.id == "drop",
       pin = b.id == "turnin" and "turnin" or blocker and "blocker" or "objective", thenLoc = thenLoc, thenTitle = thenTitle,
-      retry = b.id == "later" and q.deaths and q.deaths.count >= QT.DEATHS_BEFORE_LATER or nil }
+      retry = b.id == "later" and q.deaths and q.deaths.count >= QT.DEATHS_BEFORE_LATER or nil,
+      saved = (b.id == "later" and q.deferred) and true or nil, qlevel = q.level }
   end
 
   local total = 0
