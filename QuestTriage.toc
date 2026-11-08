@@ -1,0 +1,13 @@
+## Interface: 11507, 16000, 16001
+## Title: Quest Triage
+## Notes: Looks at your quest log and tells you what to do now, what to save for later, and what to drop.
+## Author: Taimoorkasi
+## Version: 0.4.0
+## SavedVariables: QuestTriageDB
+## SavedVariablesPerCharacter: QuestTriageCharDB
+## OptionalDeps: Questie, QuestieDB
+
+Core.lua
+Api.lua
+Guide.lua
+UI.lua
