@@ -2,108 +2,97 @@
 
 # Quest Triage
 
-**Your leveling co-pilot for World of Warcraft: Forever.** Quest Triage looks at your quest log, your bags, your gear and where you're standing, and tells you the single best thing to do next, with an arrow pointing the way.
+**Quest Triage is a leveling guide and quest helper for WoW: Forever that tells you the single best thing to do next.** It reads your quest log, bags, gear and position, then points a live arrow at your next quest, hand-in or pick-up. No route to memorize and no guide to read: one card says what to do now.
 
-No guide to read, no route to memorize. One card at the top of the panel says what to do now.
+Works with **Questie**: directions, nearby quest givers and monster spawn areas come from your Questie install.
 
 ![Quest Triage in the Barrens: the Next card says to hand in The Stagnant Oasis to Tonga Runetotem, about 2 minutes north-west, worth 13% of a level, above the sorted quest lists](docs/images/next-step.jpg)
 
-## See it in action
+## Leveling guide that adapts to you
 
-<table>
-<tr>
-<td width="50%" valign="top">
-<img src="docs/images/batch-hub.jpg" alt="The Next card in a quest hub: Hand in Raptor Thieves to Gazrog, 2 more to do here">
-</td>
-<td width="50%" valign="top">
+- **One clear next step.** Hand in, pick up, go do, or fix something first, chosen for where you're standing right now.
+- **Live waypoint arrow and travel time** ("~2 min NW"), plus a map pin with a full tooltip.
+- **Objective checklist** on the card: see what's done and what's left at a glance.
+- **Batch or one at a time.** Clear every quest in a hub before you leave and do nearby objectives in one trip, or finish, hand in, then pick up the next.
+- **Stays on track.** It sticks with the quest you're doing and finishes what you started instead of jumping around.
 
-**Clear a hub before you leave.** In Batch mode, the Next card walks you through everything nearby first: here, hand in Raptor Thieves to Gazrog, with "2 more to do here".
+![The Next card in a quest hub: Hand in Raptor Thieves to Gazrog, 2 more to do here](docs/images/batch-hub.jpg)
 
-**Everything sorted.** Turn in, Do now (grouped by zone, nearest first, with progress bars), Pick up, Needs a group, Save for later and Drop.
+*Clear a hub before you leave: Batch mode walks you through every hand-in and pick-up nearby first.*
 
-**Hover anything** for the objectives, the reason and the exact location. Click to pin it on your map.
+## Quest helper: your quest log, sorted
 
-</td>
-</tr>
-<tr>
-<td width="50%" valign="top">
-<img src="docs/images/pick-up.png" alt="The Next card: Pick up Apothecary Zamah from Apothecary Helbrim, under a minute north-west, with nearby quests to pick up listed below">
+**Turn in · Do now · Pick up · Needs a group · Save for later · Drop**, each with a one-line reason. Hover any line for the objectives, the reason and the exact location; click to pin it on your map.
 
-**Never miss a quest.** Nearby quest givers worth your time, nearest first.
-</td>
-<td width="50%" valign="top">
-<img src="docs/images/gear.png" alt="The Next card: Equip Charger's Armor of Strength, +2 Strength and -8 Armor, already in your bags">
+- **Nearby quests you haven't picked up yet**, worth doing at your level, nearest first.
+- **Save for later** shows the level to come back at; **Drop** flags grey and failed quests.
+- **Knows the game's quest areas**: inside the white boundary on your minimap it says "do it here".
+- **Catches blocked quests**: needs an item first? It says where and how to get it, with two map markers.
+- **Real hunting grounds**, not a lone spawn at the edge of the map; if kills are slow, it suggests a denser spot.
 
-**Get stronger.** Upgrades judged on real stats for your class, with the exact trade shown. One click to equip.
-</td>
-</tr>
-</table>
+![The Next card: Pick up Apothecary Zamah from Apothecary Helbrim, under a minute north-west, with nearby quests to pick up listed below](docs/images/pick-up.png)
+
+*Never miss a quest: nearby quest givers worth your time, nearest first.*
 
 ![The world map with the Quest Triage pin's tooltip: The Demon Seed needs an item, first pick up a Flawed Power Stone at The Barrens 62.3, 20.0, about 3 minutes north-east, then complete The Demon Seed](docs/images/pin-tooltip.jpg)
 
-**Map pins that explain themselves.** Hover the pin for the step, what you need first and how to get it, exact coordinates and distance, and where to go after.
+*Map pins that explain themselves: the step, what you need first and how to get it, exact coordinates and distance, and where to go after.*
+
+## Level faster and get stronger
+
+- **Gear upgrades** from quest rewards and your bags, judged on real stats for your class (never cloth for a Warrior). One click to equip.
+- **Trainer spells** read from your spellbook: it tells you when new spells unlock, so no wasted trips.
+- **Learns from your deaths**: die twice on the same quest and it moves to Save for later.
+- **Death handling**: release, run back with the arrow, resurrect, carry on.
+- **Fight check**: target a monster and see if it's risky (level, elite, rare).
+- **Auto-sell grey items** at any vendor.
+
+![The Next card: Equip Charger's Armor of Strength, +2 Strength and -8 Armor, already in your bags](docs/images/gear.png)
+
+*Upgrades judged on real stats for your class, with the exact trade shown.*
+
+## Easy to read
+
+Readable colors (7:1 contrast), every line one row, details on hover, adjustable size, and it fades in combat so it never blocks the fight.
 
 ![Quest Triage settings: leveling style Batch (fastest), lock panel position, sell gray items automatically, fade in combat, and panel size](docs/images/settings.png)
 
-**Simple settings** in the game's own Options window: Batch or one at a time, auto-sell grays, lock, size, combat fade.
-
-## What it does
-
-- **One clear next step.** The Next card picks the best move right now: hand in, pick up, go do, or fix something first. A live arrow turns with you, and travel time is shown ("~2 min NW").
-- **Your quest log, sorted.** Turn in · Do now · Pick up · Needs a group · Save for later (with the level to come back at) · Drop, each with a one-line reason in the tooltip.
-- **Quests you haven't picked up yet.** Nearby quest givers worth your time, nearest first (needs Questie).
-- **Batch or one at a time.** Batch mode grabs every quest near you before you leave a hub and groups quests whose objectives are close together into one trip. One-at-a-time finishes, hands in, then picks up the next.
-- **Knows the game's quest areas.** Standing inside a quest's area (the white boundary on the minimap)? It says "do it here", and combines overlapping quests into one step.
-- **Catches what blocks you.** A quest that needs an item first says where to get it and how ("Click the Flawed Power Stone"), with two map markers: get the item, then complete the quest.
-- **Real hunting grounds.** Points to dense spawn areas, not a stray spawn at the edge of the map. If kills are slow, it suggests a denser spot.
-- **Gets you stronger.** Gear upgrades from quest rewards and your bags, judged on real stats for your class (never cloth for a Warrior). Click to equip. New trainer spells, read from your spellbook, so no wasted trips.
-- **Learns from your deaths.** Die twice on the same quest at the same level and it moves to "Save for later: come back at 16".
-- **Death handling.** Release, run back to your corpse with the arrow, resurrect; your route resumes where you left off.
-- **Fight check.** Target a monster out of combat and see if it's risky for you (level, elite, rare).
-- **Small conveniences.** Auto-sells gray items at vendors, map pins with a full tooltip, combat fade, readable colors (7:1 contrast).
-
-## Requirements
-
-- **World of Warcraft: Forever.**
-- **[Questie](https://www.curseforge.com/wow/addons/questie)** (recommended). Directions, pick-ups, item sources and hunting areas come from Questie's database. Without it, Quest Triage still sorts your quest log, checks gear, trainers, deaths and quest areas, but can't give directions.
+*Simple settings in the game's own Options window: Batch or one at a time, auto-sell greys, lock, size, combat fade.*
 
 ## How to use
 
 The panel opens on login. Everything is in the Next card and the lists; hover any line for details.
 
-| Action | What happens |
-| --- | --- |
-| Click a line | Map pin there, map opens |
-| Shift-click a quest | Link it in chat |
-| Right-click a line | Show on map, open in quest log, hide, abandon (Drop list), try again |
-| Click the Next card's equip step | Puts the item on |
+- **Click a line:** map pin there, and the map opens.
+- **Shift-click a quest:** link it in chat.
+- **Right-click a line:** show on map, open in quest log, hide, abandon (Drop list), try again.
+- **Click an Equip step:** puts the item on.
 
-Slash commands:
+Commands: `/qt` show or hide · `/qt options` settings · `/qt stats` your leveling stats · `/qt unhide` bring back hidden quests · `/qt reset` move the panel back · `/qt debug` explain every pin (for bug reports)
 
-| Command | |
-| --- | --- |
-| `/qt` | Show or hide the panel |
-| `/qt options` | Settings: leveling style, auto-sell grays, lock, size, combat fade |
-| `/qt stats` | How you're doing: quests done, time per quest, advice followed |
-| `/qt unhide` | Bring back quests you hid |
-| `/qt reset` | Move the panel back to its default spot |
-| `/qt debug` | Explain every pin and arrow (for bug reports) |
+## FAQ
 
-## Privacy
+**Does it work without Questie?**
+Yes. It still sorts your quest log and checks gear, trainers, deaths and quest areas. Directions, nearby pick-ups and spawn areas need [Questie](https://www.curseforge.com/wow/addons/questie).
 
-Everything stays on your computer, in your SavedVariables. Quest Triage sends nothing anywhere.
+**Which game versions are supported?**
+WoW: Forever. Other versions aren't tested yet.
+
+**Is it a step-by-step leveling route?**
+No fixed route. It works out the best next step from your own quest log and position, so it fits however you play.
+
+**Does it collect any data?**
+No. Everything stays in your own SavedVariables; nothing is sent anywhere.
+
+**Where do I report bugs?**
+On GitHub: https://github.com/tamuir/QuestTriage/issues. Running `/qt debug` and attaching the output helps a lot.
+
+## Credits
+
+Directions and quest data come from [Questie](https://github.com/Questie/Questie) and QuestieDB, read at runtime from your own install; Quest Triage contains none of their code or data. Map positions use Questie's copy of HereBeDragons. Thank you to the Questie team and contributors. Open source under [GPL-3.0](LICENSE.md).
 
 ## Development
 
 - Code: `Core.lua` (decisions, no game API, fully tested), `Api.lua` (reads the game), `Guide.lua` (Questie data and map pins), `UI.lua` (panel, events, options).
 - Tests: `sh run-tests.sh` syntax-checks every file and runs `tests.lua` under Lua 5.1 in Docker.
 - Releases: add a dated section such as `## [0.5.1] - 2026-11-10` to `CHANGELOG.md` and push; GitHub Actions runs the tests, tags the version, and uploads the zip to GitHub Releases and CurseForge.
-
-## Credits
-
-- Directions, quest givers, spawn points and item sources come from **[Questie](https://github.com/Questie/Questie)** and **QuestieDB**, read at runtime from your own Questie install. Quest Triage contains none of their code or data. Thank you to the Questie team and contributors.
-- Map positions use Questie's copy of **HereBeDragons**.
-
-## License
-
-[GPL-3.0](LICENSE.md)

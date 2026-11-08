@@ -32,3 +32,8 @@ replaces its old record.
 uploads it to GitHub Releases and CurseForge for WoW: Forever. `.github/workflows/release.yml` runs it when a new
 dated section such as `## [0.5.1] - 2026-11-10` is pushed in `CHANGELOG.md`. To see the zip without publishing:
 `DRY_RUN=1 bash tools/release.sh 0.5.0`.
+
+## CurseForge description
+
+The CurseForge description is made from `README.md`: after changing the README, run
+`sh tools/curseforge-description.sh --update` to refresh it in `CURSEFORGE.md` (the Test workflow fails if you forget).

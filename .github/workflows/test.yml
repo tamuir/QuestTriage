@@ -16,4 +16,8 @@ jobs:
           for f in *.lua tools/QuestTriageShots/*.lua; do luac5.1 -p "$f"; done
           lua5.1 tests.lua
       - name: Release script syntax
-        run: bash -n tools/release.sh && sh -n tools/screenshots.sh
+        run: bash -n tools/release.sh && sh -n tools/screenshots.sh && sh -n tools/curseforge-description.sh
+      - name: CurseForge description matches the README
+        run: |
+          sh tools/curseforge-description.sh --update
+          git diff --exit-code CURSEFORGE.md || { echo "::error::README.md changed: run sh tools/curseforge-description.sh --update"; exit 1; }
