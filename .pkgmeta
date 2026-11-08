@@ -1,0 +1,18 @@
+package-as: QuestTriage
+
+# Development files stay out of the zip players download.
+ignore:
+  - tests.lua
+  - run-tests.sh
+  - pics
+  - CURSEFORGE.md
+  - README.md
+  - media/logo.svg
+  - media/logo-400.png
+  - .github
+  - .gitignore
+  - SECURITY.md
+
+manual-changelog:
+  filename: CHANGELOG.md
+  markup-type: markdown

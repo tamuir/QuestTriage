@@ -1,0 +1,35 @@
+name: Test and release
+
+on:
+  push:
+    branches: [main]
+    tags: ["v*"]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Lua 5.1 syntax check and tests
+        run: |
+          sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
+          for f in *.lua; do luac5.1 -p "$f"; done
+          lua5.1 tests.lua
+
+  # On a version tag (e.g. v0.5.0): build the zip and upload it to CurseForge and GitHub Releases.
+  # Needs the repository secret CF_API_KEY and "## X-Curse-Project-ID" in QuestTriage.toc.
+  release:
+    needs: test
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    env:
+      CF_API_KEY: ${{ secrets.CF_API_KEY }}
+      GITHUB_OAUTH: ${{ secrets.GITHUB_TOKEN }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: BigWigsMods/packager@v2

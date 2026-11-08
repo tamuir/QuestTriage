@@ -1,11 +1,17 @@
-## Interface: 11507, 16000, 16001
+## Interface: 16001
 ## Title: Quest Triage
-## Notes: Looks at your quest log and tells you what to do now, what to save for later, and what to drop.
+## Notes: Your leveling co-pilot: the best next step, where to go, what to pick up, what to skip, and how to get stronger.
 ## Author: Taimoorkasi
 ## Version: 0.5.0
+## IconTexture: Interface\AddOns\QuestTriage\media\icon-64.png
+## Category: Quests
+## X-License: GPL-3.0
+## X-Website: https://github.com/tamuir/QuestTriage
 ## SavedVariables: QuestTriageDB
 ## SavedVariablesPerCharacter: QuestTriageCharDB
 ## OptionalDeps: Questie, QuestieDB
+# After creating the CurseForge project, add its number here so releases upload automatically:
+# ## X-Curse-Project-ID: 123456
 
 Core.lua
 Api.lua

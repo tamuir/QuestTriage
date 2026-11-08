@@ -1,0 +1,33 @@
+# Changelog
+
+## 0.5.0
+
+- Death handling: release, run back to your corpse with the arrow, resurrect; the route resumes where you left off.
+- Two deaths on a quest at the same level move it to Save for later with a come-back level ("Try it again now" brings it back).
+- The route stays on track: it sticks with the current step and favours quests you've started.
+- Honours the game's quest areas: inside the white boundary the card says "do it here"; overlapping areas become one step.
+- Points to real hunting grounds instead of stray spawns; detects slow spawns from your own kills and suggests a denser spot.
+- Quests that need an item first say where and how to get it, with two map markers; helper quests stop being offered once you have the item.
+- Map pins keep Blizzard's navigation and add a Quest Triage block to its tooltip; stale pins clear themselves; `/qt debug` explains every pin.
+- Next card shows a checklist of all objectives.
+- Fight check when you target a monster; prep line for quests above your level.
+- Gear is judged on real stats per class with an armor-type check (no more cloth for Warriors).
+- Auto-sell gray items at vendors (option).
+- Better contrast: every text color reaches 7:1.
+
+## 0.4.0
+
+- Next card with a live arrow and travel time; route by distance with Batch and One-at-a-time styles.
+- Pick-ups from Questie, quest blockers, branded map pins, right-click menu, combat fade, options panel.
+
+## 0.3.0
+
+- Directions from Questie: nearby quest givers, objective and turn-in locations, map pins.
+
+## 0.2.0
+
+- Next step line, gear upgrades from quest rewards and bags, trainer reminders, automatic progress tracking (`/qt stats`).
+
+## 0.1.0
+
+- First version: sorts the quest log into Turn in, Do now, Needs a group, Save for later and Drop.
