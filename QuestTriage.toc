@@ -10,8 +10,7 @@
 ## SavedVariables: QuestTriageDB
 ## SavedVariablesPerCharacter: QuestTriageCharDB
 ## OptionalDeps: Questie, QuestieDB
-# After creating the CurseForge project, add its number here so releases upload automatically:
-# ## X-Curse-Project-ID: 123456
+## X-Curse-Project-ID: 1791811
 
 Core.lua
 Api.lua
