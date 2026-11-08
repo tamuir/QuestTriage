@@ -1,6 +1,6 @@
 # Developer tools (not part of the addon)
 
-Nothing in this folder ships to players: `.pkgmeta` leaves `tools/` out of the release zip.
+Nothing in this folder ships to players: `tools/release.sh` packs only the files the game loads.
 
 ## Screenshots for the README and CurseForge page
 
@@ -25,3 +25,10 @@ and other players' names stay out.
 
 A shot keeps one window plus the tooltip over it: Settings, else the world map, else the panel. Retaking a name
 replaces its old record.
+
+## Releases
+
+`release.sh` builds `QuestTriage-v<version>.zip` (the `.toc`, the Lua files it lists, the icon and the license) and
+uploads it to GitHub Releases and CurseForge for WoW: Forever. `.github/workflows/release.yml` runs it when a new
+dated section such as `## [0.5.1] - 2026-11-10` is pushed in `CHANGELOG.md`. To see the zip without publishing:
+`DRY_RUN=1 bash tools/release.sh 0.5.0`.

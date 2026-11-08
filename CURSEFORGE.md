@@ -115,11 +115,15 @@ the featured image.
 2. In `QuestTriage.toc`, replace the commented line with `## X-Curse-Project-ID: <your id>`.
 3. On CurseForge, create an **API token** (your account settings, API tokens).
 4. On GitHub, repo Settings > Secrets and variables > Actions, add a secret named `CF_API_KEY` with that token.
-5. Release: update `## Version` in the `.toc` and the top of `CHANGELOG.md`, commit, then tag and push:
-   `git tag v0.5.0 && git push origin v0.5.0`
-   GitHub Actions runs the tests, builds the zip (without dev files) and uploads it to CurseForge and GitHub Releases.
+5. Commit and push step 2. From then on, **releasing is one step**: add a dated section to the top of `CHANGELOG.md`,
+   such as `## [0.5.1] - 2026-11-10`, and push to main. GitHub runs the tests, tags `v0.5.1`, builds the zip (only what
+   the game loads) and uploads it to GitHub Releases and CurseForge for WoW: Forever. The version in the `.toc` is
+   stamped automatically.
 
-The first upload can also be done by hand: zip the `QuestTriage` folder without the files listed under `ignore` in `.pkgmeta` (tests, `docs`, `tools`, `pics`, `.github`, and every `media` file except `icon-64.png`), and upload it on the project's Files tab.
+The first release (0.5.0) is already in the changelog, so it goes out as soon as steps 1 to 4 are done: after pushing
+the project ID, open GitHub > Actions > Release > **Run workflow**.
+
+If CurseForge doesn't list WoW: Forever (game version 1.60.1), the release stops before publishing anything and says so.
 
 ## 5. Before you publish
 

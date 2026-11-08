@@ -1,6 +1,6 @@
 # Changelog
 
-## 0.5.0
+## [0.5.0] - 2026-11-08
 
 - Death handling: release, run back to your corpse with the arrow, resurrect; the route resumes where you left off.
 - Two deaths on a quest at the same level move it to Save for later with a come-back level ("Try it again now" brings it back).
@@ -15,19 +15,19 @@
 - Auto-sell gray items at vendors (option).
 - Better contrast: every text color reaches 7:1.
 
-## 0.4.0
+## [0.4.0] - 2026-11-08
 
 - Next card with a live arrow and travel time; route by distance with Batch and One-at-a-time styles.
 - Pick-ups from Questie, quest blockers, branded map pins, right-click menu, combat fade, options panel.
 
-## 0.3.0
+## [0.3.0] - 2026-11-08
 
 - Directions from Questie: nearby quest givers, objective and turn-in locations, map pins.
 
-## 0.2.0
+## [0.2.0] - 2026-11-08
 
 - Next step line, gear upgrades from quest rewards and bags, trainer reminders, automatic progress tracking (`/qt stats`).
 
-## 0.1.0
+## [0.1.0] - 2026-11-08
 
 - First version: sorts the quest log into Turn in, Do now, Needs a group, Save for later and Drop.

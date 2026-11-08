@@ -97,7 +97,7 @@ Everything stays on your computer, in your SavedVariables. Quest Triage sends no
 
 - Code: `Core.lua` (decisions, no game API, fully tested), `Api.lua` (reads the game), `Guide.lua` (Questie data and map pins), `UI.lua` (panel, events, options).
 - Tests: `sh run-tests.sh` syntax-checks every file and runs `tests.lua` under Lua 5.1 in Docker.
-- Releases: push a tag like `v0.5.0`; GitHub Actions runs the tests, packages the addon and uploads it to CurseForge.
+- Releases: add a dated section such as `## [0.5.1] - 2026-11-10` to `CHANGELOG.md` and push; GitHub Actions runs the tests, tags the version, and uploads the zip to GitHub Releases and CurseForge.
 
 ## Credits
 
