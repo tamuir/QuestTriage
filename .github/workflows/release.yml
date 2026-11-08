@@ -2,13 +2,14 @@
 # to main. This workflow sees a version with no tag yet, runs the tests, tags it v0.5.1, and tools/release.sh zips the
 # addon and uploads it to GitHub Releases and CurseForge for WoW: Forever. Pushing a v* tag by hand releases that tag
 # the same way, and Run workflow on GitHub re-releases the newest changelog version. (Adapted from LeanPad.)
-# Nothing is released until the CF_API_KEY repository secret exists and QuestTriage.toc has ## X-Curse-Project-ID.
+# Nothing is released until the CF_API_KEY repository secret exists and QuestTriage.toc has ## X-Curse-Project-ID;
+# adding that line releases the newest untagged changelog version by itself.
 name: Release
 
 on:
   push:
     branches: [main]
-    paths: [CHANGELOG.md]
+    paths: [CHANGELOG.md, QuestTriage.toc] # the toc too, so adding the CurseForge project ID releases the waiting version
     tags: ["v*"]
   workflow_dispatch:
 
@@ -21,7 +22,7 @@ jobs:
       version: ${{ steps.version.outputs.version }}
       release: ${{ steps.version.outputs.release }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       - id: version
@@ -58,7 +59,7 @@ jobs:
     if: needs.plan.outputs.release == 'true'
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Lua 5.1 syntax check and tests
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
@@ -75,7 +76,7 @@ jobs:
       CF_API_TOKEN: ${{ secrets.CF_API_KEY }}
       GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
       # A tag pushed with GITHUB_TOKEN starts no new run, so tagging here never releases twice.
