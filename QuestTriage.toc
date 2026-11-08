@@ -2,7 +2,7 @@
 ## Title: Quest Triage
 ## Notes: Looks at your quest log and tells you what to do now, what to save for later, and what to drop.
 ## Author: Taimoorkasi
-## Version: 0.4.0
+## Version: 0.5.0
 ## SavedVariables: QuestTriageDB
 ## SavedVariablesPerCharacter: QuestTriageCharDB
 ## OptionalDeps: Questie, QuestieDB

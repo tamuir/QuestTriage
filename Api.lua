@@ -61,32 +61,30 @@ local SLOTS = {
 local SLOT_NAMES = { "head", "neck", "shoulders", nil, "chest", "waist", "legs", "feet", "wrists", "hands",
   "ring", "ring", "trinket", "trinket", "back", "main hand", "off hand", "ranged" }
 
-local function itemLevel(link)
-  return link and C_Item.GetDetailedItemLevelInfo(link) or nil
-end
-
--- Is this item better than what you wear? Returns { name, link, score, gain, slot } or nil.
--- shortcut: item level plus "not lower quality" is the whole measure (no stats or class weights); fine for 1-60 gear.
-local function upgradeOver(link, quality)
-  local slots = SLOTS[select(4, C_Item.GetItemInfoInstant(link))]
-  local ilvl = slots and itemLevel(link)
-  if not ilvl then return nil end
-  -- Compare against the weaker of the slots it can go in.
-  local worstSlot, worstLvl, worstQ
-  for _, s in ipairs(slots) do
-    local l = itemLevel(GetInventoryItemLink("player", s)) or 0
-    if not worstLvl or l < worstLvl then worstSlot, worstLvl, worstQ = s, l, GetInventoryItemQuality("player", s) or 0 end
+-- Is this item better for your class than what you wear? Returns { name, link, score, change, slot } or nil.
+-- Uses the item's real stats and an armor-type check (QT.GearUpgrade in Core.lua), not item level.
+local STAT_LABELS = setmetatable({}, { __index = function(_, key) return _G[key] end }) -- the game's own names
+local function upgradeOver(link)
+  local _, _, _, equipLoc, _, classID, subClassID = C_Item.GetItemInfoInstant(link)
+  local slots = SLOTS[equipLoc]
+  if not slots then return nil end
+  local worn = {}
+  for i, s in ipairs(slots) do
+    local l = GetInventoryItemLink("player", s)
+    worn[i] = l and (C_Item.GetItemStats(l) or {}) or false
   end
-  local gain = ilvl - worstLvl
-  if gain <= 0 or (worstLvl > 0 and (quality or 0) < worstQ) then return nil end
-  return { name = link, link = link, score = gain, gain = worstLvl > 0 and gain or nil, slot = SLOT_NAMES[worstSlot] }
+  local _, class = UnitClass("player")
+  local up = QT.GearUpgrade({ stats = C_Item.GetItemStats(link) or {}, classID = classID, subClassID = subClassID,
+    equipLoc = equipLoc }, worn, class, UnitLevel("player"), STAT_LABELS)
+  if not up then return nil end
+  return { name = link, link = link, score = up.score, change = up.change, slot = SLOT_NAMES[slots[up.index]] }
 end
 
 local function better(a, b) return a and (not b or a.score > b.score) end
 
 -- Best gear upgrade among a quest's rewards, or nil.
 function QT.BestUpgrade(questID)
-  if not (GetQuestLogItemLink and C_Item and C_Item.GetDetailedItemLevelInfo) then return nil end
+  if not (GetQuestLogItemLink and C_Item and C_Item.GetItemStats) then return nil end
   local best
   for _, kind in ipairs({ "choice", "reward" }) do
     local count = kind == "choice" and GetNumQuestLogChoices(questID) or GetNumQuestLogRewards(questID)
@@ -127,6 +125,7 @@ function QT.ReadPower(level)
     end
   end
   p.train, p.nextSpells = QT.TrainerAdvice(QT.ScanSpellbook(level), QuestTriageCharDB.trainer, level)
+  p.autoSell = QuestTriageDB.opts and QuestTriageDB.opts.autoSellJunk
   return p
 end
 
@@ -195,8 +194,13 @@ local function readModern()
           upgrade = QT.BestUpgrade(id),
           objectives = {},
         }
-        q.loc = QT.QuestLocation(id, q.isComplete)
-        if not q.isComplete then q.blockers = QT.QuestBlockers(id) end
+        if not q.isComplete then
+          q.blockers = QT.QuestBlockers(id)
+          -- The game's own quest area (white boundary on the minimap): are you standing in it?
+          q.inArea = C_Minimap and C_Minimap.IsInsideQuestBlob and C_Minimap.IsInsideQuestBlob(id) or nil
+        end
+        -- Decided after inArea: inside the area, the location is the nearest spawn there, never elsewhere.
+        q.loc = QT.QuestLocation(id, q.isComplete, q.inArea)
         local c = GetQuestDifficultyColor and GetQuestDifficultyColor(q.level or 0)
         if c then q.color = string.format("ff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255) end
         local objs = C_QuestLog.GetQuestObjectives and C_QuestLog.GetQuestObjectives(id) or {}

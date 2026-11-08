@@ -17,7 +17,7 @@ assert(QT.Classify(q{ title = "C", level = 4 }, player) == "drop")
 assert(select(2, QT.Classify(q{ title = "R", level = 12 }, player)) == "")
 assert(QT.Classify(q{ title = "G", level = 12, isTrivial = true }, player) == "drop")
 assert(QT.Classify(q{ title = "H", level = 4, isTrivial = false }, player) == "now")
-local b, r = QT.Classify(q{ title = "D", level = 4, upgrade = { name = "Boots", gain = 3, slot = "feet" } }, player)
+local b, r = QT.Classify(q{ title = "D", level = 4, upgrade = { name = "Boots", change = "+3 Strength", slot = "feet" } }, player)
 assert(b == "now" and r:find("Boots") and r:find("+3", 1, true), r)
 assert(QT.Classify(q{ title = "E", level = 12, isFailed = true, upgrade = { name = "X", slot = "feet" } }, player) == "drop")
 
@@ -45,7 +45,7 @@ assert(QT.Where({ yards = 200, dir = "E", zone = "Durotar" }, player) == "<1 min
 local t = QT.Triage({
   q{ title = "Half done", level = 12, zone = "Durotar", objectives = { { text = "5/10", have = 5, need = 10 } } },
 }, player)
-local acts, rem = QT.BestActions(t, { bagUpgrade = { name = "Axe", link = "L", gain = 4 }, durability = 0,
+local acts, rem = QT.BestActions(t, { bagUpgrade = { name = "Axe", link = "L", change = "+4.2 damage per second" }, durability = 0,
   train = "Learn 2 new spells at your class trainer.", freeSlots = 1, junk = 3 })
 assert(acts[1].icon == "repair" and acts[2].kind == "equip" and acts[3].text == "Go do Half done")
 assert(#rem == 2 and rem[1]:find("trainer") and rem[2] == "Sell 3 grey items")
@@ -65,7 +65,7 @@ local ba = QT.BestActions(hub, {}, player, groups, { style = "batch" })
 assert(ba[1].text == "Pick up Nearby from Gornek", "batch: grab the quest next to you first: " .. ba[1].text)
 groups = QT.PickupGroups({}, player)
 ba = QT.BestActions(hub, {}, player, groups, { style = "batch" })
-assert(ba[1].text:find("^Go do Pack") and ba[1].sub:find("2 more quests nearby"), "batch: the cluster beats the closer lone quest")
+assert(ba[1].text:find("^Go do Pack") and ba[1].sub:find("same trip: Pack ., Pack ."), "batch: the cluster beats the closer lone quest")
 local sa = QT.BestActions(hub, {}, player, groups, { style = "single" })
 assert(sa[1].text == "Go do Lone", "single: just the nearest quest")
 -- Single mode: finish what you have before picking up more.
@@ -89,16 +89,27 @@ local ha = QT.BestActions(r2, {}, player, nil, { style = "batch" })
 assert(ha[1].text == "Hand in Far" and ha[1].sub == "to Gornek")
 
 -- Blockers: a quest missing its item sends you to get it first, and says why.
+local stone = at(-1000, 0, "Flawed Power Stone", "The Barrens")
+stone.x, stone.y = 47.1, 12.4
 local seed = q{ title = "The Demon Seed", level = 12, questID = 924, loc = at(-1100, 0, "Altar", "The Barrens"),
-  blockers = { { text = "Pick up Flawed Power Stone", loc = at(-1000, 0, "Flawed Power Stone", "The Barrens") } } }
+  blockers = { { text = "Pick up Flawed Power Stone", how = "Click the Flawed Power Stone", loc = stone } } }
 local bt = QT.Triage({ seed }, player)
-assert(bt.now[1].reason:find("^First: Pick up Flawed Power Stone"))
+assert(bt.now[1].reason:find("^First: Pick up Flawed Power Stone%. Click the Flawed Power Stone%."), bt.now[1].reason)
 local bb = QT.BestActions(bt, {}, player)
-assert(bb[1].text == "Pick up Flawed Power Stone first" and bb[1].icon == "blocker" and bb[1].sub == "You need it for The Demon Seed")
+assert(bb[1].text == "Pick up Flawed Power Stone first" and bb[1].icon == "blocker"
+  and bb[1].sub == "Click the Flawed Power Stone · needed for The Demon Seed", bb[1].sub)
 local br = QT.BuildRows(bt, player, {}, {})
 local seedRow = has(br, "The Demon Seed")
 assert(seedRow and seedRow.style == "item" and seedRow.icon == "blocker" and seedRow.text:find("needs item"),
   "the blocked quest stays listed with its warning")
+assert(seedRow.loc == stone and seedRow.pin == "blocker", "the row points where to get the item, not at the altar")
+assert(seedRow.tip[1]:find("^First: Pick up Flawed Power Stone%. Click the Flawed Power Stone at Flawed Power Stone, The Barrens 47%.1, 12%.4"),
+  seedRow.tip[1])
+-- An item with no known source still says so, instead of pointing somewhere wrong.
+local lost = QT.Triage({ q{ title = "Odd", level = 12, questID = 9, loc = at(10, 0),
+  blockers = { { text = "Get Strange Key", how = "Questie doesn't know where it comes from" } } } }, player)
+local la = QT.BestActions(lost, {}, player)
+assert(la[1].text == "Get Strange Key first" and la[1].loc == nil and la[1].sub:find("doesn't know"))
 -- The blocker's own pickup isn't listed twice.
 local dup = QT.PickupGroups({ { questID = 926, title = "Flawed Power Stone", level = 12,
   giver = at(-1000, 0, "Flawed Power Stone", "The Barrens") } }, player)
@@ -194,6 +205,109 @@ assert(QT.BestActions(mo, {}, player, nil, { style = "batch" })[1].text == "Go d
 -- The Next card carries its key so the panel can remember it.
 assert(QT.BuildRows(mo, player, {}, { style = "batch" })[1].key == "do:1")
 
+-- Quest areas: standing inside the game's own boundary means "do it here", never "go somewhere else".
+local area = QT.Triage({
+  q{ title = "Raptor Thieves", level = 12, questID = 1, loc = at(300, 0), inArea = true,
+    objectives = { { text = "5/12 Raptor Head", have = 5, need = 12 } } },
+  q{ title = "Closer", level = 12, questID = 2, loc = at(50, 0) },
+}, player)
+local ar = QT.BuildRows(area, player, {}, { style = "single", committed = "do:2" })
+assert(ar[1].text == "Do Raptor Thieves here" and ar[1].here, "inside the area wins, even over the current step")
+assert(ar[1].sub:find("^You're in the area") and ar[1].sub:find("nearest <1 min"), ar[1].sub)
+assert(ar[1].checklist and ar[1].checklist[1] == "- 5/12 Raptor Head", "objectives show as a checklist on the card")
+assert(not has(ar, "^%[12%] Raptor Thieves"), "not listed twice")
+-- Two areas overlapping: one step for both, both left out of the list.
+local two2 = QT.Triage({
+  q{ title = "Raptor Thieves", level = 12, questID = 1, loc = at(300, 0), inArea = true,
+    objectives = { { text = "5/12 Raptor Head", have = 5, need = 12 } } },
+  q{ title = "Prowlers", level = 12, questID = 3, loc = at(200, 0), inArea = true,
+    objectives = { { text = "0/7 Prowler Claws", have = 0, need = 7 } } },
+  q{ title = "Elsewhere", level = 12, questID = 4, loc = at(900, 0) },
+}, player)
+local tr = QT.BuildRows(two2, player, {}, { style = "batch" })
+assert(tr[1].text == "Do 2 quests here" and tr[1].key == "area:1,3", tr[1].text)
+assert(tr[1].sub:find("Raptor Thieves %(5/12 Raptor Head%)") and tr[1].sub:find("Prowlers %(0/7 Prowler Claws%)"), tr[1].sub)
+assert(#tr[1].tip == 2 and not has(tr, "^%[12%] Raptor") and not has(tr, "^%[12%] Prowlers") and has(tr, "^%[12%] Elsewhere"))
+-- A quest you're in the area of, but missing its item, still sends you for the item first.
+local blockedHere = QT.Triage({ q{ title = "Seed", level = 12, questID = 5, loc = at(10, 0), inArea = true,
+  blockers = { { text = "Pick up Stone", loc = at(400, 0, "Stone") } } } }, player)
+assert(QT.BestActions(blockedHere, {}, player)[1].text == "Pick up Stone first")
+
+-- Hunting areas: go to the nearest real hunting ground, not the nearest stray spawn (your Barrens raptors).
+local stray = { density = 1, dist = 80, loc = { name = "stray" } }
+local ground = { density = 14, dist = 900, loc = { name = "ground" } }
+local smaller = { density = 5, dist = 600, loc = { name = "smaller" } }
+assert(QT.PickHuntingArea({ stray, ground }).loc.name == "ground", "a lone spawn is skipped")
+assert(QT.PickHuntingArea({ stray, ground, smaller }).loc.name == "smaller", "nearest area with real density wins")
+assert(QT.PickHuntingArea({ { density = 1, dist = 700, loc = { name = "Kreenig" } } }).loc.name == "Kreenig",
+  "a named mob with one spawn still has a location")
+assert(QT.PickHuntingArea(nil) == nil and QT.PickHuntingArea({}) == nil)
+-- Better spot: only when clearly denser than where you stand, and within reach.
+local hereA = { density = 4, dist = 100, loc = {} }
+local better, hd = QT.PickBetterSpot({ hereA, ground })
+assert(better == ground and hd == 4)
+assert(QT.PickBetterSpot({ hereA, { density = 5, dist = 500, loc = {} } }) == nil, "5 vs 4 isn't worth the walk")
+assert(QT.PickBetterSpot({ hereA, { density = 30, dist = 5000, loc = {} } }) == nil, "too far away")
+
+-- Slow spawns: measured from your own progress, never guessed.
+assert(QT.SlowCheck(nil, 1000) == nil and QT.SlowCheck({ gains = {} }, 1000) == nil, "not in the area: nothing to judge")
+assert(QT.SlowCheck({ enteredAt = 1000, gains = {} }, 1200) == nil, "under 5 minutes: too early to call")
+local slow = QT.SlowCheck({ enteredAt = 1000, gains = { 1100, 1400 } }, 1600) -- 2 in 10 min
+assert(slow and slow.gains == 2 and slow.minutes == 10)
+assert(QT.SlowCheck({ enteredAt = 1000, gains = { 1050, 1150, 1250, 1350 } }, 1600) == nil, "4 in 10 min is fine")
+assert(QT.SlowCheck({ enteredAt = 0, gains = { 10, 20, 30, 40, 50, 60 } }, 2000).gains == 0, "only the last 15 min count")
+-- A slow quest with a denser spot elsewhere: go there. Without one: do nearby work first.
+local slowQ = q{ title = "Raptor Thieves", level = 12, questID = 1, loc = at(20, 0), inArea = true,
+  slow = { minutes = 10, gains = 2 }, objectives = { { text = "7/12 Raptor Head", have = 7, need = 12 } } }
+slowQ.altLoc = at(0, -900, "Bloodtalon Raptor")
+slowQ.altLoc.spawns, slowQ.altLoc.hereSpawns = 18, 6
+local sr = QT.BuildRows(QT.Triage({ slowQ }, player), player, {}, {})
+assert(sr[1].text == "Try another spot for Raptor Thieves" and sr[1].loc.yards == 900, sr[1].text)
+assert(sr[1].sub:find("Slow here: only 2 in 10 min · 18 spawn points there vs 6 here"), sr[1].sub)
+slowQ.altLoc = nil
+local other = q{ title = "Nearby", level = 12, questID = 2, loc = at(300, 0) }
+local sa2 = QT.BestActions(QT.Triage({ slowQ, other }, player), {}, player, nil, { style = "single" })
+assert(sa2[1].text == "Go do Nearby" and sa2[2].sub:find("do something nearby and come back"))
+local slowRows = QT.BuildRows(QT.Triage({ slowQ, other }, player), player, {}, { style = "single" })
+assert(has(slowRows, "Raptor Thieves.*slow"), "the list tags it slow")
+
+-- Deaths: dying twice on a quest at your level moves it to Save for later, with the level to come back at.
+local died = q{ title = "Kreenig", level = 14, questID = 7, deaths = { count = 2, level = 12 } }
+local db, dr, dback = QT.Classify(died, player)
+assert(db == "later" and dback == 14 and dr:find("died 2 times") and dr:find("Come back at 14"), dr)
+assert(QT.Classify(q{ title = "Once", level = 12, deaths = { count = 1, level = 12 } }, player) == "now", "one death isn't enough")
+assert(QT.Classify(q{ title = "Old", level = 12, deaths = { count = 3, level = 10 } }, player) == "now",
+  "deaths at a lower level don't count once you've levelled")
+assert(select(3, QT.Classify(q{ title = "Easy", level = 11, deaths = { count = 2, level = 12 } }, player)) == 14,
+  "come back at least 2 levels higher")
+local dRows = QT.BuildRows(QT.Triage({ died }, player), player, {}, { expanded = { later = true } })
+local dRow = has(dRows, "Kreenig")
+assert(dRow and dRow.text:find("at level 14") and dRow.retry, "later row shows its level and offers a retry")
+assert(has(QT.BuildRows(QT.Triage({ q{ title = "Hi", level = 20 } }, player), player, {}, { expanded = { later = true } }),
+  "at level 18"), "level-based later still shows its own level")
+
+-- Fight check: honest about what it knows.
+local me = { level = 14 }
+assert(QT.FightCheck({ name = "Kreenig", level = 16, classification = "normal", canAttack = true }, me)
+  :find("level 16 %(%+2%), risky.*Pull it alone and start at full health"))
+assert(QT.FightCheck({ name = "Boar", level = 13, classification = "normal", canAttack = true }, me) == nil, "easy: say nothing")
+assert(QT.FightCheck({ name = "Boar", level = 14, classification = "normal", canAttack = true }, { level = 14, manaPct = 30 })
+  :find("Drink first %(mana 30%%%)"))
+assert(QT.FightCheck({ name = "Ogre", level = 15, classification = "elite", canAttack = true }, me):find("needs a group"))
+assert(QT.FightCheck({ name = "Boss", level = -1, classification = "normal", canAttack = true }, me):find("Leave it"))
+assert(QT.FightCheck({ name = "Guard", level = 30, canAttack = false }, me) == nil, "friendly: nothing")
+assert(QT.FightCheck({ name = "Corpse", level = 16, canAttack = true, dead = true }, me) == nil)
+local fRows = QT.BuildRows(QT.Triage({}, player), player, {}, { fight = { name = "Kreenig", level = 15, canAttack = true } })
+assert(fRows[2].style == "alert" and fRows[2].text:find("Kreenig"), "fight check sits right under the Next card")
+
+-- Prep: heading to a quest above your level says how to get ready, from real data only.
+local hard = QT.Triage({ q{ title = "Tough", level = 14, questID = 1, loc = at(50, 0) } }, player)
+local hRows = QT.BuildRows(hard, player, { train = "Learn 1 new spell at your class trainer.", durability = 40 }, {})
+assert(hRows[1].sub:find("^Hard %(%+2%): train and repair first, start at full health"), hRows[1].sub)
+assert(QT.BuildRows(hard, player, {}, {})[1].sub:find("^Hard %(%+2%): start at full health"))
+assert(not (QT.BuildRows(QT.Triage({ q{ title = "Fine", level = 12, questID = 1, loc = at(50, 0) } }, player), player, {}, {})[1].sub or "")
+  :find("Hard"), "no prep line for quests at your level")
+
 local s = QT.Stats({
   [1] = { result = "done", bucket = "now", accepted = 0, finished = 600 },
   [2] = { result = "done", bucket = "later", accepted = 0, finished = 1200 },
@@ -202,5 +316,65 @@ local s = QT.Stats({
 })
 assert(s.done == 2 and s.dropped == 1 and s.judged == 3 and s.followed == 2 and s.avgMinutes == 15)
 assert(#QT.FormatStats(s) == 3)
+
+-- Checklist: every objective, done ones checked, so you see what's finished and what's left.
+local multi = q{ title = "The Disruption Ends", level = 12, questID = 30, loc = at(100, 0), objectives = {
+  { text = "8/8 Razormane Geomancer slain", have = 8, need = 8 },
+  { text = "2/8 Razormane Defender slain", have = 2, need = 8 },
+  { text = "0/1 Kreenig Snarlsnout's Tusk", have = 0, need = 1 } } }
+local cl = QT.Checklist(multi)
+assert(#cl == 3 and cl[1]:find("ReadyCheck%-Ready") and cl[1]:find("8/8 Razormane Geomancer slain"))
+assert(cl[2] == "- 2/8 Razormane Defender slain" and cl[3] == "- 0/1 Kreenig Snarlsnout's Tusk")
+assert(QT.Checklist(q{ title = "None" }) == nil)
+local mr = QT.BuildRows(QT.Triage({ multi }, player), player, {}, {})
+assert(mr[1].text == "Go do The Disruption Ends" and #mr[1].checklist == 3, "the Next card lists all three")
+assert(not (mr[1].sub or ""):find("Geomancer"), "objectives aren't repeated in the subtext")
+
+-- Gear: your exact case. Cloth gloves (+1 Str, +1 Sta, +2 Spi, 17 armor) vs worn mail gloves (68 armor), Warrior 14.
+local mailGloves = { RESISTANCE0_NAME = 68 }
+local clothGloves = { ITEM_MOD_STRENGTH_SHORT = 1, ITEM_MOD_STAMINA_SHORT = 1, ITEM_MOD_SPIRIT_SHORT = 2, RESISTANCE0_NAME = 17 }
+assert(QT.GearUpgrade({ stats = clothGloves, classID = 4, subClassID = 1, equipLoc = "INVTYPE_HAND" },
+  { mailGloves }, "WARRIOR", 14) == nil, "cloth is never suggested to a Warrior")
+assert(QT.GearUpgrade({ stats = clothGloves, classID = 4, subClassID = 3, equipLoc = "INVTYPE_HAND" },
+  { mailGloves }, "WARRIOR", 14) == nil, "even as mail, losing 51 armor for 1 Str + 1 Sta isn't worth it")
+local betterMail = { ITEM_MOD_STRENGTH_SHORT = 3, ITEM_MOD_STAMINA_SHORT = 2, RESISTANCE0_NAME = 80 }
+local gu = QT.GearUpgrade({ stats = betterMail, classID = 4, subClassID = 3, equipLoc = "INVTYPE_HAND" },
+  { mailGloves }, "WARRIOR", 14)
+assert(gu and gu.change == "+3 Strength, +2 Stamina, +12 Armor", gu and gu.change)
+-- Casters can wear cloth; the same gloves are an upgrade for a mage wearing nothing better.
+assert(QT.GearUpgrade({ stats = clothGloves, classID = 4, subClassID = 1, equipLoc = "INVTYPE_HAND" },
+  { { RESISTANCE0_NAME = 10 } }, "MAGE", 14).change == "+1 Strength, +1 Stamina, +2 Spirit, +7 Armor",
+  "the same cloth gloves are a real upgrade for a mage")
+assert(QT.GearUpgrade({ stats = { ITEM_MOD_INTELLECT_SHORT = 4, RESISTANCE0_NAME = 15 }, classID = 4, subClassID = 1,
+  equipLoc = "INVTYPE_HAND" }, { { RESISTANCE0_NAME = 10 } }, "MAGE", 14).change == "+4 Intellect, +5 Armor")
+-- Empty slots, cloaks, rings and weapons.
+assert(QT.GearUpgrade({ stats = clothGloves, classID = 4, subClassID = 3, equipLoc = "INVTYPE_HAND" }, { false },
+  "WARRIOR", 14).change == nil, "fills an empty slot")
+assert(QT.ArmorOK("WARRIOR", 14, 4, 1, "INVTYPE_CLOAK"), "cloaks are cloth for everyone")
+assert(not QT.ArmorOK("WARRIOR", 40, 4, 3, "INVTYPE_CHEST") and QT.ArmorOK("WARRIOR", 40, 4, 4, "INVTYPE_CHEST"), "plate at 40")
+assert(QT.GearUpgrade({ stats = { ITEM_MOD_STRENGTH_SHORT = 3 }, classID = 4, subClassID = 0, equipLoc = "INVTYPE_FINGER" },
+  { { ITEM_MOD_STRENGTH_SHORT = 5 }, { ITEM_MOD_STAMINA_SHORT = 1 } }, "WARRIOR", 14).index == 2, "replaces the weaker ring")
+assert(QT.GearUpgrade({ stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 9.5 }, classID = 2, subClassID = 7, equipLoc = "INVTYPE_WEAPON" },
+  { { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 7.2 } }, "WARRIOR", 14).change == "+2.3 damage per second")
+
+-- Readability: every text color in Core.lua, and the secondary-text gray, reach 7:1 (WCAG AAA) against the panel,
+-- even with a white sky showing through it.
+do
+  local function lin(c) return c <= 0.03928 and c / 12.92 or ((c + 0.055) / 1.055) ^ 2.4 end
+  local function lum(t) return 0.2126 * lin(t[1]) + 0.7152 * lin(t[2]) + 0.0722 * lin(t[3]) end
+  local function ratio(a, b) local l1, l2 = lum(a), lum(b); if l1 < l2 then l1, l2 = l2, l1 end; return (l1 + 0.05) / (l2 + 0.05) end
+  local bgc = QT.PANEL_BG
+  local bg = { bgc[1] * bgc[4] + (1 - bgc[4]), bgc[2] * bgc[4] + (1 - bgc[4]), bgc[3] * bgc[4] + (1 - bgc[4]) }
+  local src = io.open("Core.lua"):read("*a")
+  local seen = 0
+  for h in src:gmatch('"ff(%x%x%x%x%x%x)"') do
+    local c = { tonumber(h:sub(1, 2), 16) / 255, tonumber(h:sub(3, 4), 16) / 255, tonumber(h:sub(5, 6), 16) / 255 }
+    assert(ratio(c, bg) >= 7, string.format("color %s is only %.1f:1", h, ratio(c, bg)))
+    seen = seen + 1
+  end
+  assert(seen >= 8, "found the palette")
+  local g = QT.META_GRAY
+  assert(ratio({ g, g, g }, bg) >= 7, "secondary text gray")
+end
 
 print("all tests passed")
