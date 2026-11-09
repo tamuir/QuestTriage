@@ -407,6 +407,16 @@ do
   assert(acts[1].loc == vendor and acts[1].sub == "Broken gear gives you no stats · at Gruk", "broken gear: go to the vendor")
 end
 
+-- The giver's own offer list beats Questie: not offered by them -> marked; offered later -> cleared.
+do
+  local no = {}
+  local starters = { [1] = { 50 }, [2] = { 50, 60 }, [3] = { 70 } }
+  QT.MarkOffered(starters, 50, { [2] = true }, no)
+  assert(no[1] and not no[2] and not no[3], "only this NPC's quests that it didn't offer")
+  QT.MarkOffered(starters, 50, { [1] = true, [2] = true }, no)
+  assert(not no[1], "offered now (prerequisite done): back in the list")
+end
+
 -- Readability: every text color in Core.lua, and the secondary-text gray, reach 7:1 (WCAG AAA) against the panel,
 -- even with a white sky showing through it.
 do

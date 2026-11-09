@@ -287,7 +287,7 @@ function QT.ReadPickups()
   local list = {}
   for questID in pairs(M.AQ.__availableQuests) do
     local ok, quest = pcall(M.DB.GetQuest, questID)
-    if ok and quest and not quest.isHidden and not helperNotNeeded[questID] then
+    if ok and quest and not quest.isHidden and not helperNotNeeded[questID] and not QuestTriageCharDB.notOffered[questID] then
       local giver = cached("start:" .. questID, function() return M.DU.GetNearestFinisherOrStarter(quest.Starts) end, "quest giver")
       table.insert(list, {
         questID = questID, title = quest.name, level = quest.level, requiredLevel = quest.requiredLevel,
@@ -297,6 +297,18 @@ function QT.ReadPickups()
     end
   end
   return list
+end
+
+-- You're talking to npcID, which offers these quests: correct Questie where it was wrong (see QT.MarkOffered).
+function QT.NoteOffered(npcID, offered)
+  if not load() then return end
+  local starters = {}
+  for questID in pairs(M.AQ.__availableQuests) do
+    local ok, quest = pcall(M.DB.GetQuest, questID)
+    local npcs = ok and quest and quest.Starts and quest.Starts.NPC
+    if npcs then starters[questID] = npcs end
+  end
+  QT.MarkOffered(starters, npcID, offered, QuestTriageCharDB.notOffered)
 end
 
 -- Native icons for each kind of step (all verified in the Forever atlas list). Shared with UI.lua.

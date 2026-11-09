@@ -356,6 +356,17 @@ function QT.HearthTip(bind, inn, zoneText)
       "Your hearthstone then brings you back to this town." } }
 end
 
+-- What a quest giver actually offers beats Questie's guess. starters = { [questID] = { npcID, ... } } for the
+-- quests Questie says you can pick up; offered = { [questID] = true } from the NPC you're talking to.
+-- Quests this NPC gives but didn't offer are marked in notOffered; ones it does offer are cleared.
+function QT.MarkOffered(starters, npcID, offered, notOffered)
+  for questID, npcs in pairs(starters) do
+    for _, id in ipairs(npcs) do
+      if id == npcID then notOffered[questID] = (not offered[questID]) or nil end
+    end
+  end
+end
+
 -- Quests you can pick up, grouped by giver: nearest first, then closest to your level.
 -- Only ones worth doing now: required level met, not grey, at most MAX_LEVELS_ABOVE over you.
 -- pickups (from Guide.lua): { questID, title, level, requiredLevel, isGroup, giver = loc }; hidden = { [questID] = true }

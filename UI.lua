@@ -720,11 +720,31 @@ local function requestRender()
   C_Timer.After(0.5, function() pending = false; QT.Render() end)
 end
 
+-- Talking to a quest giver: the quests they really offer you right now (gossip or quest greeting window).
+local function noteOffered(event)
+  local guid = UnitGUID("npc")
+  if not guid or (issecretvalue and issecretvalue(guid)) then return end
+  local kind, _, _, _, _, id = strsplit("-", guid)
+  local npcID = kind == "Creature" and tonumber(id)
+  if not npcID then return end
+  local offered = {}
+  if event == "GOSSIP_SHOW" then
+    for _, q in ipairs(C_GossipInfo.GetAvailableQuests()) do offered[q.questID] = true end
+  else
+    for i = 1, GetNumAvailableQuests() do
+      local questID = select(5, GetAvailableQuestInfo(i))
+      if questID then offered[questID] = true end
+    end
+  end
+  QT.NoteOffered(npcID, offered)
+  requestRender()
+end
+
 for _, e in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE", "PLAYER_LEVEL_UP",
   "PLAYER_EQUIPMENT_CHANGED", "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "BAG_UPDATE_DELAYED",
   "UPDATE_INVENTORY_DURABILITY", "ZONE_CHANGED_NEW_AREA", "TRAINER_SHOW", "TRAINER_UPDATE",
   "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST",
-  "PLAYER_TARGET_CHANGED", "PLAYER_INSIDE_QUEST_BLOB_STATE_CHANGED", "MERCHANT_SHOW", "HEARTHSTONE_BOUND" }) do
+  "PLAYER_TARGET_CHANGED", "PLAYER_INSIDE_QUEST_BLOB_STATE_CHANGED", "MERCHANT_SHOW", "HEARTHSTONE_BOUND", "GOSSIP_SHOW", "QUEST_GREETING" }) do
   frame:RegisterEvent(e)
 end
 frame:SetScript("OnEvent", function(self, event, arg1, arg2)
@@ -743,6 +763,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     QuestTriageCharDB.deaths = QuestTriageCharDB.deaths or {}
     QuestTriageCharDB.deferred = QuestTriageCharDB.deferred or {}
     QuestTriageCharDB.hearthSkip = QuestTriageCharDB.hearthSkip or {}
+    QuestTriageCharDB.notOffered = QuestTriageCharDB.notOffered or {}
     if QuestTriageDB.pos then
       local p = QuestTriageDB.pos
       self:ClearAllPoints()
@@ -757,6 +778,8 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
   if event == "PLAYER_ENTERING_WORLD" then
     if QuestTriageDB.shown ~= false then QT.SetShown(true) end
     requestRender()
+  elseif event == "GOSSIP_SHOW" or event == "QUEST_GREETING" then
+    noteOffered(event)
   elseif event == "MERCHANT_SHOW" then
     sellJunk()
   elseif event == "PLAYER_DEAD" then
@@ -793,6 +816,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     requestRender()
   elseif event == "PLAYER_LEVEL_UP" then
     QuestTriageCharDB.levels[arg1] = time()
+    QuestTriageCharDB.notOffered = {} -- a new level can unlock them: trust Questie again until the giver says no
     -- UnitLevel is not updated yet when this fires; wait a moment.
     C_Timer.After(1, requestRender)
   else
