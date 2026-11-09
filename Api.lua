@@ -108,6 +108,12 @@ function QT.ReadPower(level)
     for slot = 1, C_Container.GetContainerNumSlots(bag) do
       local info = C_Container.GetContainerItemInfo(bag, slot)
       if info then
+        -- An item that starts a quest you don't have yet: opening it is a free pick-up.
+        local qi = C_Container.GetContainerItemQuestInfo(bag, slot)
+        if qi and qi.questID and not qi.isActive and not p.bagQuest and not QuestTriageCharDB.hidden[qi.questID]
+            and not C_QuestLog.IsQuestFlaggedCompleted(qi.questID) then
+          p.bagQuest = { questID = qi.questID, link = info.hyperlink, name = C_Item.GetItemNameByID(info.itemID) or "the quest item" }
+        end
         if info.quality == 0 and not info.hasNoValue then
           p.junk = p.junk + 1
         elseif C_PlayerInfo.CanUseItem(info.itemID) then

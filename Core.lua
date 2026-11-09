@@ -515,6 +515,11 @@ function QT.BestActions(buckets, power, player, groups, opts)
     add({ icon = "equip", text = "Equip " .. up.name, kind = "equip", data = up.link,
       sub = up.change and (up.change .. " · already in your bags") or "Fills an empty slot" })
   end
+  local bq = power.bagQuest
+  if bq then
+    add({ icon = "pickup", text = "Open " .. bq.name, kind = "bags", data = bq.link, questID = bq.questID,
+      sub = "In your bags: right-click it to start its quest" })
+  end
   if power.train then table.insert(reminders, power.train) end
   if d and d > 0 and d < 25 and not r then table.insert(reminders, string.format("Repair soon (gear at %d%%)", d)) end
   if power.freeSlots and power.freeSlots <= 2 then

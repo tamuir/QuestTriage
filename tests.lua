@@ -407,6 +407,13 @@ do
   assert(acts[1].loc == vendor and acts[1].sub == "Broken gear gives you no stats · at Gruk", "broken gear: go to the vendor")
 end
 
+-- A quest-starting item in your bags is a free pick-up: it's the Next step.
+do
+  local empty = { turnin = {}, now = {}, group = {}, later = {}, drop = {} }
+  local acts = QT.BestActions(empty, { bagQuest = { questID = 7, name = "Chen's Empty Keg", link = "L" } }, { level = 17 })
+  assert(acts[1].text == "Open Chen's Empty Keg" and acts[1].kind == "bags" and acts[1].questID == 7, "open the item")
+end
+
 -- The giver's own offer list beats Questie: not offered by them -> marked; offered later -> cleared.
 do
   local no = {}

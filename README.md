@@ -24,6 +24,7 @@ Works with **Questie**: directions, nearby quest givers and monster spawn areas 
 
 **Turn in · Do now · Pick up · Needs a group · Save for later · Drop**, each with a one-line reason. Hover any line for the objectives, the reason and the exact location; click to pin it on your map.
 
+- **Quest items in your bags**: an item that starts a quest you don't have yet becomes the next step, "Open" it.
 - **Nearby quests you haven't picked up yet**, worth doing at your level, nearest first. Talk to a quest giver and it checks what they really offer you: a follow-up you can't take yet drops off the list until you can.
 - **Save for later** shows the level to come back at; **Drop** flags grey and failed quests.
 - **Knows the game's quest areas**: inside the white boundary on your minimap it says "do it here".

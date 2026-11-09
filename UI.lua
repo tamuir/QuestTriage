@@ -209,6 +209,8 @@ local function onRowClick(row, button)
     else
       C_Item.EquipItemByName(row.data)
     end
+  elseif row.kind == "bags" then
+    OpenAllBags() -- using the item for you would need a secure button; you right-click it
   elseif row.kind == "toggle" then
     QuestTriageDB.expanded[row.data] = not QuestTriageDB.expanded[row.data]
     QT.Render()
@@ -220,13 +222,14 @@ local HINTS = {
   questLoc = "Click: map pin and open the map.",
   ["goto"] = "Click: map pin and open the map.",
   equip = "Click: put it on.",
+  bags = "Click: open your bags.",
   toggle = "Click: show or hide.",
 }
 
 -- Details live here, not in the panel: objectives, reason, exact location, XP, then what clicks do.
 local function onRowEnter(row)
   GameTooltip:SetOwner(row, "ANCHOR_LEFT")
-  if row.kind == "equip" then
+  if row.kind == "equip" or row.kind == "bags" then
     GameTooltip:SetHyperlink(row.data)
   else
     GameTooltip:SetText(row.text:GetText(), 1, 1, 1, 1, true)
@@ -569,6 +572,12 @@ function QT.Render()
   sub:SetText(string.format("Level %d%s%s", player.level, pct and string.format(" · %d%%", pct) or "",
     power.nextSpells and string.format(" · spells at %d", power.nextSpells) or ""))
   local pickups = QT.ReadPickups()
+  -- A quest you can start from your bags is shown as "Open <item>", not as a trip to where it drops.
+  if pickups and power.bagQuest then
+    for i = #pickups, 1, -1 do
+      if pickups[i].questID == power.bagQuest.questID then table.remove(pickups, i) end
+    end
+  end
   local death = UnitIsDeadOrGhost("player") and { ghost = UnitIsGhost("player") } or nil
   if death and death.ghost then death.corpse = QT.CorpseLocation() end
   -- Where your hearthstone is set; its position is learned once you stand at that inn.
