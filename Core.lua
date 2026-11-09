@@ -494,14 +494,18 @@ function QT.BestActions(buckets, power, player, groups, opts)
   local function add(a) table.insert(acts, a) end
   if opts.death then add(deathStep(opts.death)) end
   local d = power.durability
-  if d and d == 0 then add({ icon = "repair", text = "Repair your gear", sub = "Broken gear gives you no stats." }) end
+  local r = power.repairAt -- nearest repair vendor, when gear is low
+  if d and d == 0 then
+    add({ icon = "repair", text = "Repair your gear", kind = r and "goto" or nil, loc = r,
+      sub = "Broken gear gives you no stats" .. (r and r.name and (" · at " .. r.name) or "") })
+  end
   local up = power.bagUpgrade
   if up then
     add({ icon = "equip", text = "Equip " .. up.name, kind = "equip", data = up.link,
       sub = up.change and (up.change .. " · already in your bags") or "Fills an empty slot" })
   end
   if power.train then table.insert(reminders, power.train) end
-  if d and d > 0 and d < 25 then table.insert(reminders, string.format("Repair soon (gear at %d%%)", d)) end
+  if d and d > 0 and d < 25 and not r then table.insert(reminders, string.format("Repair soon (gear at %d%%)", d)) end
   if power.freeSlots and power.freeSlots <= 2 then
     table.insert(reminders, power.junk and power.junk > 0 and string.format(power.autoSell and "%d grey items sell automatically at any vendor" or "Sell %d grey items", power.junk)
       or "Make room in your bags")
@@ -749,6 +753,12 @@ function QT.BuildRows(buckets, player, power, opts, groups)
   end
   local fight = opts.fight and QT.FightCheck(opts.fight, { level = player.level, manaPct = opts.manaPct })
   if fight then add({ style = "alert", icon = "blocker", text = fight }) end
+  local dur, rep = power.durability, power.repairAt
+  if dur and dur > 0 and dur < 25 and rep then
+    add({ style = "item", icon = "repair", kind = "goto", loc = rep, right = QT.Short(rep),
+      text = string.format("Repair soon (gear at %d%%): %s", dur, rep.name or "nearest vendor"),
+      tip = { "Nearest repair vendor: " .. (rep.name or "?") .. (rep.zone and (", " .. rep.zone) or "") } })
+  end
   if opts.hearth then add(opts.hearth) end
   if #reminders > 0 then add({ style = "note", text = "Also: " .. table.concat(reminders, " · ") }) end
   local xp = QT.XPSummary(buckets, player)

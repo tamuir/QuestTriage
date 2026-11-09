@@ -44,6 +44,7 @@ Works with **Questie**: directions, nearby quest givers and monster spawn areas 
 - **Trainer spells** read from your spellbook: it tells you when new spells unlock, so no wasted trips.
 - **Learns from your deaths**: die twice on the same quest and it moves to Save for later.
 - **Death handling**: release, run back with the arrow, resurrect, carry on.
+- **Nearest repair vendor** when your gear drops below 25%: click to pin it.
 - **Hearthstone tip**: in a town far from where your hearthstone is set, it suggests making that inn your home, so your hearthstone brings you back to where you're questing. Right-click to skip an inn, or turn it off in settings.
 - **Fight check**: target a monster and see if it's risky (level, elite, rare).
 - **Auto-sell grey items** at any vendor.

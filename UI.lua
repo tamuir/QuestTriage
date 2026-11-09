@@ -579,7 +579,7 @@ function QT.Render()
     QuestTriageCharDB.bind = bind
   end
   if not death and QuestTriageDB.opts.hearthTips then
-    hearth = QT.HearthTip(bind, QT.NearestInn(), GetMinimapZoneText())
+    hearth = QT.HearthTip(bind, QT.NearestTownsfolk("Innkeeper"), GetMinimapZoneText())
     if hearth and QuestTriageCharDB.hearthSkip[hearth.hearth] then hearth = nil end
   end
   local specs = QT.BuildRows(buckets, player, power,

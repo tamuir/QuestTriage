@@ -124,6 +124,7 @@ function QT.ReadPower(level)
       if not p.durability or pct < p.durability then p.durability = pct end
     end
   end
+  if p.durability and p.durability < 25 and QT.NearestTownsfolk then p.repairAt = QT.NearestTownsfolk("Repair") end
   p.train, p.nextSpells = QT.TrainerAdvice(QT.ScanSpellbook(level), QuestTriageCharDB.trainer, level)
   p.autoSell = QuestTriageDB.opts and QuestTriageDB.opts.autoSellJunk
   return p

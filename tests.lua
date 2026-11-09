@@ -393,6 +393,20 @@ do
   assert(has(rows, "^Set your hearthstone"), "shown in the panel")
 end
 
+-- Repairs: with a known vendor, low gear becomes a clickable row (and broken gear a Next step) pointing at it.
+do
+  local empty = { turnin = {}, now = {}, group = {}, later = {}, drop = {} }
+  local vendor = { name = "Gruk", zone = "The Barrens", yards = 300, dir = "SE" }
+  local rows = QT.BuildRows(empty, { level = 10 }, { durability = 18, repairAt = vendor }, {})
+  local r = has(rows, "^Repair soon")
+  assert(r and r.text == "Repair soon (gear at 18%): Gruk" and r.loc == vendor and r.kind == "goto", "repair row")
+  assert(not has(rows, "^Also: Repair"), "not also a reminder")
+  assert(has(QT.BuildRows(empty, { level = 10 }, { durability = 18 }, {}), "^Also: Repair soon %(gear at 18%%%)"),
+    "no vendor known: reminder only")
+  local acts = QT.BestActions(empty, { durability = 0, repairAt = vendor }, { level = 10 })
+  assert(acts[1].loc == vendor and acts[1].sub == "Broken gear gives you no stats · at Gruk", "broken gear: go to the vendor")
+end
+
 -- Readability: every text color in Core.lua, and the secondary-text gray, reach 7:1 (WCAG AAA) against the panel,
 -- even with a white sky showing through it.
 do

@@ -319,30 +319,30 @@ function QT.CorpseLocation()
   loc.wx, loc.wy, loc.inst = HBD:GetWorldCoordinatesFromZone(x, y, mapID)
   return withVector(loc)
 end
--- Innkeepers friendly to you, from Questie's townsfolk list (built at Questie boot). Built once.
-local inns
-function QT.NearestInn()
+-- Nearest friendly townsfolk of one kind ("Innkeeper", "Repair"), from Questie's townsfolk list (built at Questie boot).
+local folks = {} -- [kind] = { loc, ... }, built once per kind
+function QT.NearestTownsfolk(kind)
   if not load() then return nil end
-  if not inns then
+  if not folks[kind] then
     local list = {}
     pcall(function()
       local T = QuestieLoader:ImportModule("Townsfolk")
-      for _, id in ipairs(T.townsfolk and T.townsfolk.Innkeeper or {}) do
+      for _, id in ipairs(T.townsfolk and T.townsfolk[kind] or {}) do
         local n = M.DB:GetNPC(id)
         for areaId, spawns in pairs(n and n.friendly and n.spawns or {}) do
           for _, s in ipairs(spawns) do
             local loc = toLoc(s, areaId, n.name)
-            if loc and loc.wx then loc.source = "innkeeper"; table.insert(list, loc) end
+            if loc and loc.wx then loc.source = kind; table.insert(list, loc) end
           end
         end
       end
     end)
     if #list == 0 then return nil end -- Questie not booted yet: try again next time
-    inns = list
+    folks[kind] = list
   end
   local px, py, pinst = HBD:GetPlayerWorldPosition()
   local best, bestSq
-  for _, loc in ipairs(px and inns or {}) do
+  for _, loc in ipairs(px and folks[kind] or {}) do
     local sq = loc.inst == pinst and (loc.wx - px) ^ 2 + (loc.wy - py) ^ 2
     if sq and (not bestSq or sq < bestSq) then best, bestSq = loc, sq end
   end
