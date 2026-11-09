@@ -71,7 +71,14 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 - **Right-click a line:** show on map, open in quest log, share with party, save for later (until a level you pick, or until you bring it back), hide, abandon (Drop list), try again.
 - **Click an Equip step:** puts the item on.
 
-Commands: `/qt` show or hide · `/qt options` settings · `/qt stats` your leveling stats · `/qt unhide` bring back hidden quests · `/qt reset` move the panel back · `/qt debug` explain every pin (for bug reports)
+| Command | What it does |
+| --- | --- |
+| `/qt` | Show or hide the panel |
+| `/qt options` | Open the settings |
+| `/qt stats` | Your leveling stats |
+| `/qt unhide` | Bring back hidden quests |
+| `/qt reset` | Move the panel back to its starting spot |
+| `/qt debug` | Explain every pin (for bug reports) |
 
 ## FAQ
 
