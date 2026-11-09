@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.1] - 2026-11-09
+
 - Save any quest for later from the right-click menu: until a level you pick (it comes back on its own) or until you bring it back with "Do it now".
 - Quest items in your bags: an item that starts a quest you don't have yet (like Chen's Empty Keg) becomes the Next step. Click to open your bags; right-click the step to hide it.
 - Pick-ups trust the quest giver over Questie: when you talk to an NPC, quests Questie lists for them that they don't offer yet (follow-ups whose earlier quest you haven't done) leave the list until they're offered or you level up.
