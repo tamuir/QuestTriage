@@ -151,13 +151,35 @@ local function huntingArea(questID)
   return best and best.loc
 end
 
+-- Blizzard's own marker for a quest: the spot it draws its blue quest area around, on your map or the quest's
+-- zone map. The game gives one point per quest per map; the area outlines themselves aren't readable.
+-- Read fresh each time: the game moves it as objectives complete, and it can be empty until map data loads.
+local function blizzardMarker(questID)
+  local quest = M.DB.GetQuest(questID)
+  local zoneMap = quest and quest.zoneOrSort and quest.zoneOrSort > 0 and M.Zone:GetUiMapIdByAreaId(quest.zoneOrSort)
+  for _, mapID in ipairs({ C_Map.GetBestMapForUnit("player") or zoneMap, zoneMap }) do
+    for _, p in ipairs(C_QuestLog.GetQuestsOnMap(mapID) or {}) do
+      if p.questID == questID then
+        local info = C_Map.GetMapInfo(mapID)
+        local wx, wy, inst = HBD:GetWorldCoordinatesFromZone(p.x, p.y, mapID)
+        return withVector({ zone = info and info.name, uiMapId = mapID, x = p.x * 100, y = p.y * 100,
+          wx = wx, wy = wy, inst = inst, source = "Blizzard quest marker" })
+      end
+    end
+  end
+end
+
 -- Where to go for a quest in your log:
 --   complete            -> the turn-in NPC
 --   inside its area     -> the nearest spawn, which is inside the area you're standing in (never somewhere else)
---   otherwise           -> the nearest real hunting area, else Questie's nearest objective point
---                          (objects, items, quests without spawn lists)
+--   otherwise           -> Blizzard's quest marker; only without one: the nearest real hunting area, else
+--                          Questie's nearest objective point (objects, items, quests without spawn lists)
 function QT.QuestLocation(questID, isComplete, inArea)
   if not load() then return nil end
+  if not isComplete and not inArea then
+    local marker = blizzardMarker(questID)
+    if marker then return marker end
+  end
   local key = (isComplete and "end:" or inArea and "here:" or "obj:") .. questID
   return cached(key, function()
     local quest = M.DB.GetQuest(questID)

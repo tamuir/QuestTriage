@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.5.2] - 2026-11-09
+
+- Quest locations follow Blizzard's own quest marker (the spot inside the blue quest area on your map) instead of a spot worked out from Questie's spawn points. Questie's spawn points are only used for quests Blizzard doesn't mark.
+
 ## [0.5.1] - 2026-11-09
 
 - Save any quest for later from the right-click menu: until a level you pick (it comes back on its own) or until you bring it back with "Do it now".
