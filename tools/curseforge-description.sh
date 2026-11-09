@@ -3,7 +3,7 @@
 # drops the logo (CurseForge shows its own) and the Development section, and turns relative links and image paths
 # into full addresses on GitHub, which is where CurseForge loads the images from.
 #   sh tools/curseforge-description.sh            print it
-#   sh tools/curseforge-description.sh --update   also write it into CURSEFORGE.md, between its markers
+#   sh tools/curseforge-description.sh --update   write it to CURSEFORGE-DESCRIPTION.md, ready to paste
 set -e
 cd "$(dirname "$0")/.."
 RAW="https://raw.githubusercontent.com/tamuir/QuestTriage/main"
@@ -19,14 +19,8 @@ desc=$(tr -d '\r' < README.md | awk '
   sed -e "s#](docs/images/#]($RAW/docs/images/#g" -e "s#](media/#]($RAW/media/#g" -e "s#](LICENSE.md)#]($REPO/LICENSE.md)#g")
 
 if [ "$1" = "--update" ]; then
-  printf '%s\n' "$desc" > .cf-desc.tmp
-  awk '
-    /<!-- curseforge-description:start -->/ { print; print "```markdown"; while ((getline line < ".cf-desc.tmp") > 0) print line; print "```"; skip = 1; next }
-    /<!-- curseforge-description:end -->/ { skip = 0 }
-    !skip' CURSEFORGE.md > CURSEFORGE.md.tmp
-  mv CURSEFORGE.md.tmp CURSEFORGE.md
-  rm -f .cf-desc.tmp
-  echo "CURSEFORGE.md updated from README.md"
+  printf '%s\n' "$desc" > CURSEFORGE-DESCRIPTION.md
+  echo "CURSEFORGE-DESCRIPTION.md updated from README.md"
 else
   printf '%s\n' "$desc"
 fi

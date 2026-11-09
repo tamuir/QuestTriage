@@ -20,4 +20,4 @@ jobs:
       - name: CurseForge description matches the README
         run: |
           sh tools/curseforge-description.sh --update
-          git diff --exit-code CURSEFORGE.md || { echo "::error::README.md changed: run sh tools/curseforge-description.sh --update"; exit 1; }
+          git diff --exit-code CURSEFORGE-DESCRIPTION.md || { echo "::error::README.md changed: run sh tools/curseforge-description.sh --update"; exit 1; }

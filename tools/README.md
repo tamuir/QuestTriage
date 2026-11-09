@@ -36,4 +36,4 @@ dated section such as `## [0.5.1] - 2026-11-10` is pushed in `CHANGELOG.md`. To 
 ## CurseForge description
 
 The CurseForge description is made from `README.md`: after changing the README, run
-`sh tools/curseforge-description.sh --update` to refresh it in `CURSEFORGE.md` (the Test workflow fails if you forget).
+`sh tools/curseforge-description.sh --update` to refresh `CURSEFORGE-DESCRIPTION.md` (the Test workflow fails if you forget).
