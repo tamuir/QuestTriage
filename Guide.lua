@@ -303,7 +303,7 @@ end
 QT.ICONS = {
   pickup = "QuestNormal", turnin = "QuestTurnin", objective = "Crosshair_Quest_48",
   blocker = "services-icon-warning", equip = "bags-greenarrow", train = "Class",
-  repair = "Repair", bags = "Banker", group = "communities-icon-chat", death = "DeathIcon",
+  repair = "Repair", bags = "Banker", group = "communities-icon-chat", death = "DeathIcon", hearth = "Innkeeper",
 }
 
 -- Where your corpse is, when it's on the map you're on. Works without Questie (no arrow then).
@@ -319,6 +319,36 @@ function QT.CorpseLocation()
   loc.wx, loc.wy, loc.inst = HBD:GetWorldCoordinatesFromZone(x, y, mapID)
   return withVector(loc)
 end
+-- Innkeepers friendly to you, from Questie's townsfolk list (built at Questie boot). Built once.
+local inns
+function QT.NearestInn()
+  if not load() then return nil end
+  if not inns then
+    local list = {}
+    pcall(function()
+      local T = QuestieLoader:ImportModule("Townsfolk")
+      for _, id in ipairs(T.townsfolk and T.townsfolk.Innkeeper or {}) do
+        local n = M.DB:GetNPC(id)
+        for areaId, spawns in pairs(n and n.friendly and n.spawns or {}) do
+          for _, s in ipairs(spawns) do
+            local loc = toLoc(s, areaId, n.name)
+            if loc and loc.wx then loc.source = "innkeeper"; table.insert(list, loc) end
+          end
+        end
+      end
+    end)
+    if #list == 0 then return nil end -- Questie not booted yet: try again next time
+    inns = list
+  end
+  local px, py, pinst = HBD:GetPlayerWorldPosition()
+  local best, bestSq
+  for _, loc in ipairs(px and inns or {}) do
+    local sq = loc.inst == pinst and (loc.wx - px) ^ 2 + (loc.wy - py) ^ 2
+    if sq and (not bestSq or sq < bestSq) then best, bestSq = loc, sq end
+  end
+  return withVector(best)
+end
+
 local LABELS = { pickup = "Pick up", turnin = "Hand in", objective = "Objective", blocker = "Do this first",
   group = "Group quest" }
 

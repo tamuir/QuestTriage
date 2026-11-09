@@ -331,6 +331,31 @@ local function between(a, b)
   end
 end
 
+-- Hearthstone: worth setting at the inn you're near when it's set somewhere far away.
+-- bind = { name = GetBindLocation(), wx, wy, inst }: the position is learned (written into bind) the first time
+-- you stand at that inn. Until then it only speaks at an inn, where the zone name settles it (the game's own check).
+-- inn = nearest friendly innkeeper loc with yards; zoneText = GetMinimapZoneText(). Returns a row or nil.
+QT.INN_NEAR = 300    -- yards: you're in this inn's town
+QT.INN_AT = 60       -- yards: you're at the inn
+QT.HEARTH_FAR = 1000 -- yards: a bind closer than this is fine
+function QT.HearthTip(bind, inn, zoneText)
+  if not (bind and bind.name and inn and inn.yards and inn.yards <= QT.INN_NEAR) then return nil end
+  if not bind.wx and inn.yards <= QT.INN_AT and bind.name == zoneText then
+    bind.wx, bind.wy, bind.inst = inn.wx, inn.wy, inn.inst
+  end
+  if bind.wx then
+    local d = between(bind, inn)
+    if d and d <= QT.HEARTH_FAR then return nil end
+  elseif inn.yards > QT.INN_AT or bind.name == zoneText then
+    return nil
+  end
+  return { style = "item", icon = "hearth", kind = "goto", loc = inn,
+    hearth = (inn.name or "?") .. "|" .. (inn.zone or ""),
+    text = "Set your hearthstone here (now " .. bind.name .. ")",
+    tip = { "Talk to " .. (inn.name or "the innkeeper") .. " and choose \"Make this inn your home\".",
+      "Your hearthstone then brings you back to this town." } }
+end
+
 -- Quests you can pick up, grouped by giver: nearest first, then closest to your level.
 -- Only ones worth doing now: required level met, not grey, at most MAX_LEVELS_ABOVE over you.
 -- pickups (from Guide.lua): { questID, title, level, requiredLevel, isGroup, giver = loc }; hidden = { [questID] = true }
@@ -724,6 +749,7 @@ function QT.BuildRows(buckets, player, power, opts, groups)
   end
   local fight = opts.fight and QT.FightCheck(opts.fight, { level = player.level, manaPct = opts.manaPct })
   if fight then add({ style = "alert", icon = "blocker", text = fight }) end
+  if opts.hearth then add(opts.hearth) end
   if #reminders > 0 then add({ style = "note", text = "Also: " .. table.concat(reminders, " · ") }) end
   local xp = QT.XPSummary(buckets, player)
   if xp then add({ style = "note", text = xp }) end

@@ -374,6 +374,25 @@ assert(QT.GearUpgrade({ stats = { ITEM_MOD_STRENGTH_SHORT = 3 }, classID = 4, su
 assert(QT.GearUpgrade({ stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 9.5 }, classID = 2, subClassID = 7, equipLoc = "INVTYPE_WEAPON" },
   { { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 7.2 } }, "WARRIOR", 14).change == "+2.3 damage per second")
 
+-- Hearthstone tip: at an inn far from your bind, suggest it; learn the bind position when you stand at it.
+do
+  local function inn(yards, wx) return { name = "Innkeeper Boorand", zone = "The Barrens", yards = yards, wx = wx, wy = 0, inst = 1 } end
+  local b = { name = "Razor Hill" }
+  assert(not QT.HearthTip(b, inn(500, 0), "The Crossroads"), "too far from the inn to be in its town")
+  assert(not QT.HearthTip(b, inn(200, 0), "The Crossroads"), "unknown bind position: only speaks at the inn")
+  local t = QT.HearthTip(b, inn(30, 0), "The Crossroads")
+  assert(t and t.text == "Set your hearthstone here (now Razor Hill)" and t.hearth == "Innkeeper Boorand|The Barrens", "at a different inn")
+  assert(not b.wx, "doesn't learn a position from someone else's inn")
+  assert(not QT.HearthTip(b, inn(30, 5000), "Razor Hill") and b.wx == 5000, "bound here: silent, and learns the position")
+  assert(not QT.HearthTip(b, inn(250, 5500), "Razor Hill Outskirts"), "known bind 500 yd away: fine")
+  assert(QT.HearthTip(b, inn(250, 0), "The Crossroads"), "known bind far away: suggests from anywhere in town")
+  b.inst = 2
+  assert(QT.HearthTip(b, inn(250, 5000), "Somewhere"), "bound on another continent")
+  local rows = QT.BuildRows({ turnin = {}, now = {}, group = {}, later = {}, drop = {} }, { level = 10 }, {},
+    { hearth = t })
+  assert(has(rows, "^Set your hearthstone"), "shown in the panel")
+end
+
 -- Readability: every text color in Core.lua, and the secondary-text gray, reach 7:1 (WCAG AAA) against the panel,
 -- even with a white sky showing through it.
 do

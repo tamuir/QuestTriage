@@ -3,6 +3,7 @@
 ## [Unreleased]
 
 - Save any quest for later from the right-click menu: until a level you pick (it comes back on its own) or until you bring it back with "Do it now".
+- Hearthstone tip: in a town far from where your hearthstone is set, it suggests setting it at the inn there. Right-click to skip that inn, or turn tips off in settings.
 - Share a quest with your party from the right-click menu (shown when you're in a group and the quest can be shared).
 
 ## [0.5.0] - 2026-11-08

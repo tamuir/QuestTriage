@@ -13,7 +13,7 @@ local metaFont = CreateFont("QuestTriageFontMeta")
 metaFont:CopyFontObject(GameFontHighlightSmall)
 metaFont:SetTextColor(QT.META_GRAY, QT.META_GRAY, QT.META_GRAY)
 
-local DEFAULTS = { style = "batch", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true }
+local DEFAULTS = { style = "batch", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true }
 
 local frame = CreateFrame("Frame", "QuestTriageFrame", UIParent,
   BackdropTemplateMixin and "BackdropTemplate" or nil)
@@ -141,6 +141,12 @@ local function rowMenu(row)
   MenuUtil.CreateContextMenu(row, function(_, root)
     root:CreateTitle(row.text:GetText())
     if row.loc then root:CreateButton("Show on map", function() pinRow(row) end) end
+    if row.hearth then
+      root:CreateButton("Don't suggest this inn", function()
+        QuestTriageCharDB.hearthSkip[row.hearth] = true
+        QT.Render()
+      end)
+    end
     if questID and C_QuestLog.GetLogIndexForQuestID(questID) then
       root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(questID) end)
       -- Same check and call as Blizzard's objective tracker menu.
@@ -303,7 +309,7 @@ local function layout(specs)
     r.kind, r.data, r.tip, r.loc, r.pin = s.kind, s.data, s.tip, s.loc, s.pin or s.icon
     r.questID, r.drop, r.yards, r.retry = s.questID, s.drop, s.yards or (s.loc and s.loc.yards), s.retry
     r.pinQuestID, r.thenLoc, r.thenTitle = s.pinQuestID, s.thenLoc, s.thenTitle
-    r.saved, r.qlevel = s.saved, s.qlevel
+    r.saved, r.qlevel, r.hearth = s.saved, s.qlevel, s.hearth
 
     local left = st.x
     if st.icon then
@@ -565,9 +571,20 @@ function QT.Render()
   local pickups = QT.ReadPickups()
   local death = UnitIsDeadOrGhost("player") and { ghost = UnitIsGhost("player") } or nil
   if death and death.ghost then death.corpse = QT.CorpseLocation() end
+  -- Where your hearthstone is set; its position is learned once you stand at that inn.
+  local bindName, hearth = GetBindLocation()
+  local bind = QuestTriageCharDB.bind
+  if bindName and (not bind or bind.name ~= bindName) then
+    bind = { name = bindName }
+    QuestTriageCharDB.bind = bind
+  end
+  if not death and QuestTriageDB.opts.hearthTips then
+    hearth = QT.HearthTip(bind, QT.NearestInn(), GetMinimapZoneText())
+    if hearth and QuestTriageCharDB.hearthSkip[hearth.hearth] then hearth = nil end
+  end
   local specs = QT.BuildRows(buckets, player, power,
     { expanded = QuestTriageDB.expanded, style = QuestTriageDB.opts.style,
-      committed = QuestTriageCharDB.committed, death = death, fight = QT.ReadTarget(), manaPct = QT.ReadManaPct() },
+      committed = QuestTriageCharDB.committed, death = death, hearth = hearth, fight = QT.ReadTarget(), manaPct = QT.ReadManaPct() },
     pickups and QT.PickupGroups(pickups, player, hidden))
   -- Remember the Next step so it stays Next until done (survives death and /reload).
   if specs[1] and specs[1].key then QuestTriageCharDB.committed = specs[1].key end
@@ -671,6 +688,11 @@ local function registerOptions()
     "Sell gray items automatically", DEFAULTS.autoSellJunk)
   Settings.CreateCheckbox(category, junk, "When you open any vendor, sell all gray (Poor) items and show what they made.")
 
+  local hearthTips = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_HEARTH", "hearthTips", opts, Settings.VarType.Boolean,
+    "Suggest where to set your hearthstone", DEFAULTS.hearthTips)
+  hearthTips:SetValueChangedCallback(function() QT.Render() end)
+  Settings.CreateCheckbox(category, hearthTips, "When you're in a town far from where your hearthstone is set, suggest setting it at the inn there.")
+
   local fade = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_FADE", "fadeInCombat", opts, Settings.VarType.Boolean,
     "Fade in combat", DEFAULTS.fadeInCombat)
   Settings.CreateCheckbox(category, fade, "Fade the panel to 30% in combat and let clicks pass through it.")
@@ -702,7 +724,7 @@ for _, e in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE"
   "PLAYER_EQUIPMENT_CHANGED", "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "BAG_UPDATE_DELAYED",
   "UPDATE_INVENTORY_DURABILITY", "ZONE_CHANGED_NEW_AREA", "TRAINER_SHOW", "TRAINER_UPDATE",
   "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST",
-  "PLAYER_TARGET_CHANGED", "PLAYER_INSIDE_QUEST_BLOB_STATE_CHANGED", "MERCHANT_SHOW" }) do
+  "PLAYER_TARGET_CHANGED", "PLAYER_INSIDE_QUEST_BLOB_STATE_CHANGED", "MERCHANT_SHOW", "HEARTHSTONE_BOUND" }) do
   frame:RegisterEvent(e)
 end
 frame:SetScript("OnEvent", function(self, event, arg1, arg2)
@@ -720,6 +742,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     QuestTriageCharDB.hidden = QuestTriageCharDB.hidden or {}
     QuestTriageCharDB.deaths = QuestTriageCharDB.deaths or {}
     QuestTriageCharDB.deferred = QuestTriageCharDB.deferred or {}
+    QuestTriageCharDB.hearthSkip = QuestTriageCharDB.hearthSkip or {}
     if QuestTriageDB.pos then
       local p = QuestTriageDB.pos
       self:ClearAllPoints()
