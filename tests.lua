@@ -373,6 +373,16 @@ assert(QT.GearUpgrade({ stats = { ITEM_MOD_STRENGTH_SHORT = 3 }, classID = 4, su
   { { ITEM_MOD_STRENGTH_SHORT = 5 }, { ITEM_MOD_STAMINA_SHORT = 1 } }, "WARRIOR", 14).index == 2, "replaces the weaker ring")
 assert(QT.GearUpgrade({ stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 9.5 }, classID = 2, subClassID = 7, equipLoc = "INVTYPE_WEAPON" },
   { { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 7.2 } }, "WARRIOR", 14).change == "+2.3 damage per second")
+-- A two-hander must beat weapon and shield together (Api.lua passes them summed with QT.AddStats).
+do
+  local axe = { stats = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 10.9, ITEM_MOD_STAMINA_SHORT = 6, ITEM_MOD_SPIRIT_SHORT = 6 },
+    classID = 2, subClassID = 1, equipLoc = "INVTYPE_2HWEAPON" }
+  local mace, shield = { ITEM_MOD_DAMAGE_PER_SECOND_SHORT = 7 }, { RESISTANCE0_NAME = 450, ITEM_MOD_STAMINA_SHORT = 2 }
+  assert(QT.GearUpgrade(axe, { mace }, "WARRIOR", 19), "beats the one-hander alone")
+  assert(not QT.GearUpgrade(axe, { QT.AddStats(mace, shield) }, "WARRIOR", 19), "but not one-hander plus shield")
+  local s = QT.AddStats(mace, shield)
+  assert(s.ITEM_MOD_DAMAGE_PER_SECOND_SHORT == 7 and s.RESISTANCE0_NAME == 450 and QT.AddStats(nil, shield).ITEM_MOD_STAMINA_SHORT == 2)
+end
 
 -- Hearthstone tip: at an inn far from your bind, suggest it; learn the bind position when you stand at it.
 do

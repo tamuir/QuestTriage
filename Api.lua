@@ -53,7 +53,7 @@ local SLOTS = {
   INVTYPE_HEAD = { 1 }, INVTYPE_NECK = { 2 }, INVTYPE_SHOULDER = { 3 }, INVTYPE_CHEST = { 5 }, INVTYPE_ROBE = { 5 },
   INVTYPE_WAIST = { 6 }, INVTYPE_LEGS = { 7 }, INVTYPE_FEET = { 8 }, INVTYPE_WRIST = { 9 }, INVTYPE_HAND = { 10 },
   INVTYPE_FINGER = { 11, 12 }, INVTYPE_TRINKET = { 13, 14 }, INVTYPE_CLOAK = { 15 },
-  -- shortcut: 1h and 2h weapons are compared to the main hand only; ignores dual wield and off-hand loss.
+  -- shortcut: 1h weapons are compared to the main hand only; ignores dual wield. 2h: see upgradeOver.
   INVTYPE_WEAPON = { 16 }, INVTYPE_2HWEAPON = { 16 }, INVTYPE_WEAPONMAINHAND = { 16 },
   INVTYPE_WEAPONOFFHAND = { 17 }, INVTYPE_SHIELD = { 17 }, INVTYPE_HOLDABLE = { 17 },
   INVTYPE_RANGED = { 18 }, INVTYPE_RANGEDRIGHT = { 18 }, INVTYPE_THROWN = { 18 }, INVTYPE_RELIC = { 18 },
@@ -73,6 +73,9 @@ local function upgradeOver(link)
     local l = GetInventoryItemLink("player", s)
     worn[i] = l and (C_Item.GetItemStats(l) or {}) or false
   end
+  -- A two-hander takes the off hand too: it has to beat your weapon and shield (or off-hand) together.
+  local off = equipLoc == "INVTYPE_2HWEAPON" and GetInventoryItemLink("player", 17)
+  if off then worn[1] = QT.AddStats(worn[1], C_Item.GetItemStats(off)) end
   local _, class = UnitClass("player")
   local up = QT.GearUpgrade({ stats = C_Item.GetItemStats(link) or {}, classID = classID, subClassID = subClassID,
     equipLoc = equipLoc }, worn, class, UnitLevel("player"), STAT_LABELS)
@@ -116,7 +119,7 @@ function QT.ReadPower(level)
         end
         if info.quality == 0 and not info.hasNoValue then
           p.junk = p.junk + 1
-        elseif C_PlayerInfo.CanUseItem(info.itemID) then
+        elseif C_PlayerInfo.CanUseItem(info.itemID) and not QuestTriageCharDB.skipItems[info.itemID] then
           local up = upgradeOver(info.hyperlink, info.quality)
           if better(up, p.bagUpgrade) then p.bagUpgrade = up end
         end

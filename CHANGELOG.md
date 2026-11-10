@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+## [0.5.3] - 2026-11-10
+
+- Two-handed weapons are compared against your weapon and shield (or off-hand) together, so tanking with a shield no longer gets a two-hander pushed at you.
+- Right-click an Equip step and choose "Don't suggest this item" to silence it. `/qt unhide` brings hidden items back.
+
 ## [0.5.2] - 2026-11-09
 
 - Quest locations follow Blizzard's own quest marker (the spot inside the blue quest area on your map) instead of a spot worked out from Questie's spawn points. Questie's spawn points are only used for quests Blizzard doesn't mark.

@@ -87,7 +87,7 @@ help:SetScript("OnEnter", function(self)
   GameTooltip:AddDoubleLine("/qt", "show or hide", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt options", "settings", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt stats", "how you're doing", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
-  GameTooltip:AddDoubleLine("/qt unhide", "bring back hidden quests", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt unhide", "bring back hidden quests and items", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt reset", "move the panel back", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt debug", "explain every pin and arrow", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   if session.done > 0 then
@@ -147,6 +147,12 @@ local function rowMenu(row)
         QT.Render()
       end)
     end
+    if row.kind == "equip" and row.data then
+      root:CreateButton("Don't suggest this item", function()
+        QuestTriageCharDB.skipItems[C_Item.GetItemInfoInstant(row.data)] = true
+        QT.Render()
+      end)
+    end
     if questID and C_QuestLog.GetLogIndexForQuestID(questID) then
       root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(questID) end)
       -- Same check and call as Blizzard's objective tracker menu.
@@ -196,7 +202,7 @@ end
 
 local function onRowClick(row, button)
   if button == "RightButton" then
-    if row.questID or row.loc then rowMenu(row) end
+    if row.questID or row.loc or row.kind == "equip" then rowMenu(row) end
   elseif IsShiftKeyDown() and row.questID then
     linkQuest(row.questID)
   elseif row.kind == "goto" or (row.kind == "quest" and row.loc) then
@@ -221,7 +227,7 @@ local HINTS = {
   quest = "Click: open in your quest log.",
   questLoc = "Click: map pin and open the map.",
   ["goto"] = "Click: map pin and open the map.",
-  equip = "Click: put it on.",
+  equip = "Click: put it on. Right-click: don't suggest it.",
   bags = "Click: open your bags.",
   toggle = "Click: show or hide.",
 }
@@ -769,6 +775,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     QuestTriageCharDB.history = QuestTriageCharDB.history or {}
     QuestTriageCharDB.levels = QuestTriageCharDB.levels or {}
     QuestTriageCharDB.hidden = QuestTriageCharDB.hidden or {}
+    QuestTriageCharDB.skipItems = QuestTriageCharDB.skipItems or {}
     QuestTriageCharDB.deaths = QuestTriageCharDB.deaths or {}
     QuestTriageCharDB.deferred = QuestTriageCharDB.deferred or {}
     QuestTriageCharDB.hearthSkip = QuestTriageCharDB.hearthSkip or {}
@@ -852,7 +859,8 @@ SlashCmdList.QUESTTRIAGE = function(msg)
     QT.Debug()
   elseif msg == "unhide" then
     wipe(QuestTriageCharDB.hidden)
-    print("|cffffd100Quest Triage:|r Hidden quests are back.")
+    wipe(QuestTriageCharDB.skipItems)
+    print("|cffffd100Quest Triage:|r Hidden quests and items are back.")
     QT.Render()
   else
     QT.SetShown(not frame:IsShown())

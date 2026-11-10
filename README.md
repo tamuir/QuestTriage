@@ -76,7 +76,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 | `/qt` | Show or hide the panel |
 | `/qt options` | Open the settings |
 | `/qt stats` | Your leveling stats |
-| `/qt unhide` | Bring back hidden quests |
+| `/qt unhide` | Bring back hidden quests and items |
 | `/qt reset` | Move the panel back to its starting spot |
 | `/qt debug` | Explain every pin (for bug reports) |
 

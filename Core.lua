@@ -153,6 +153,15 @@ function QT.StatChanges(new, old, labels)
   return #parts > 0 and table.concat(parts, ", ") or nil
 end
 
+-- Two items' stats added together (a weapon and shield, which a two-hander replaces at once).
+function QT.AddStats(a, b)
+  local sum = {}
+  for _, stats in ipairs({ a or {}, b or {} }) do
+    for k, v in pairs(stats) do sum[k] = (sum[k] or 0) + v end
+  end
+  return sum
+end
+
 -- Is this item an upgrade over what you wear in the slots it fits?
 -- cand = { stats, classID, subClassID, equipLoc }; worn = { [i] = stats of the item in slot i, or false if empty }.
 -- Compares against the weaker slot (rings, trinkets). Must be clearly better: 5% and half a point of score.
