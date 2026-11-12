@@ -78,7 +78,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 | `/qt stats` | Your leveling stats |
 | `/qt unhide` | Bring back hidden quests and items |
 | `/qt reset` | Move the panel back to its starting spot |
-| `/qt debug` | Explain every pin (for bug reports) |
+| `/qt debug` | Details for a bug report, ready to copy |
 
 ## FAQ
 
@@ -95,7 +95,7 @@ No fixed route. It works out the best next step from your own quest log and posi
 No. Everything stays in your own SavedVariables; nothing is sent anywhere.
 
 **Where do I report bugs?**
-On GitHub: https://github.com/tamuir/QuestTriage/issues. Running `/qt debug` and attaching the output helps a lot.
+On GitHub: https://github.com/tamuir/QuestTriage/issues. Type `/qt debug`: a window opens with the details already selected. Press Ctrl+C and paste them into your report; that helps a lot.
 
 ## Credits
 

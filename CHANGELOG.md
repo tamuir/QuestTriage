@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.5.6] - 2026-11-13
+
+- `/qt debug` opens a window with the details already selected: press Ctrl+C and paste them into a bug report. It includes your Quest Triage and Questie versions.
+
 ## [0.5.5] - 2026-11-13
 
 - Fixed Questie errors ("iconData is nil") when hovering Questie's map icons while a Quest Triage pin was set. Quest Triage now ships its own copy of the HereBeDragons map library instead of sharing Questie's, so Questie never sees our pins.

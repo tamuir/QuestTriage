@@ -89,7 +89,7 @@ help:SetScript("OnEnter", function(self)
   GameTooltip:AddDoubleLine("/qt stats", "how you're doing", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt unhide", "bring back hidden quests and items", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt reset", "move the panel back", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
-  GameTooltip:AddDoubleLine("/qt debug", "explain every pin and arrow", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt debug", "details for a bug report", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   if session.done > 0 then
     local hours = (time() - session.start) / 3600
     GameTooltip:AddLine(" ")
@@ -610,7 +610,7 @@ function QT.Render()
   layout(specs)
 end
 
--- /qt debug: everything behind the arrows and pins, to chat and to SavedVariables (QuestTriageCharDB.debug)
+-- /qt debug: everything behind the arrows and pins, in a copy window and in SavedVariables (QuestTriageCharDB.debug)
 -- so a session can be checked afterwards. Includes Blizzard's own quest marker for comparison.
 local function fmtLoc(loc)
   if not loc then return "no location" end
@@ -662,9 +662,50 @@ function QT.Debug()
         tostring(wMap), (wx or 0) * 100, (wy or 0) * 100))
     end
   end
-  QuestTriageCharDB.debug = lines
-  for _, l in ipairs(lines) do print("|cffffd100QT|r " .. l) end
-  print("|cffffd100Quest Triage:|r Saved. /reload once to write it to disk, then tell Claude.")
+  local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
+  table.insert(lines, 2, "Quest Triage " .. (meta("QuestTriage", "Version") or "?")
+    .. ", Questie " .. (meta("Questie", "Version") or "not loaded"))
+  QuestTriageCharDB.debug = lines -- also kept in SavedVariables (written on /reload)
+  QT.ShowCopyWindow("Quest Triage debug", table.concat(lines, "\n"))
+end
+
+-- A window with text selected and ready to copy (Ctrl+C), for bug reports. Native templates only.
+local copyWindow
+function QT.ShowCopyWindow(title, text)
+  if not copyWindow then
+    local f = CreateFrame("Frame", "QuestTriageCopyWindow", UIParent, "BasicFrameTemplateWithInset")
+    f:SetSize(620, 420)
+    f:SetPoint("CENTER")
+    f:SetFrameStrata("DIALOG")
+    f:SetMovable(true)
+    f:EnableMouse(true)
+    f:RegisterForDrag("LeftButton")
+    f:SetScript("OnDragStart", f.StartMoving)
+    f:SetScript("OnDragStop", f.StopMovingOrSizing)
+    tinsert(UISpecialFrames, "QuestTriageCopyWindow") -- Esc closes it
+    f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+    f.hint:SetPoint("TOPLEFT", 14, -30)
+    f.hint:SetText("Press Ctrl+C to copy, then paste it into your bug report. It holds your quest log and position, nothing else.")
+    local s = CreateFrame("ScrollFrame", nil, f, "InputScrollFrameTemplate")
+    s:SetPoint("TOPLEFT", 14, -50)
+    s:SetPoint("BOTTOMRIGHT", -14, 14)
+    s.CharCount:Hide()
+    s.EditBox:SetWidth(620 - 28 - 18)
+    s.EditBox:SetFontObject(GameFontHighlightSmall)
+    s.EditBox:SetScript("OnEscapePressed", function() f:Hide() end)
+    -- Read-only: typing puts the original text back, still selected.
+    s.EditBox:HookScript("OnTextChanged", function(eb, userInput)
+      if userInput then eb:SetText(f.text); eb:HighlightText() end
+    end)
+    f.edit = s.EditBox
+    copyWindow = f
+  end
+  copyWindow.TitleText:SetText(title)
+  copyWindow.text = text
+  copyWindow.edit:SetText(text)
+  copyWindow:Show()
+  copyWindow.edit:SetFocus()
+  copyWindow.edit:HighlightText()
 end
 
 -- Distances change as you move: refresh every 2 seconds while the panel is open.
