@@ -633,9 +633,11 @@ function QT.Debug()
   if h then table.insert(lines, "Next: " .. (h.text or "?") .. " | key " .. tostring(h.key) .. " | " .. fmtLoc(h.loc)) end
   for _, q in ipairs(QT.lastQuests or {}) do
     local b = blizz[q.questID]
-    table.insert(lines, string.format("[%s] %s%s%s | %s | Blizzard marker: %s", tostring(q.questID), q.title or "?",
-      q.isComplete and " (complete)" or "", q.inArea and " (you're in its area)" or "", fmtLoc(q.loc),
-      b and string.format("%.1f, %.1f", b.x * 100, b.y * 100) or "none on this map"))
+    local any = QT.BlizzardMarker and QT.BlizzardMarker(q.questID)
+    table.insert(lines, string.format("[%s] %s%s%s | %s | Blizzard marker: %s | your or quest's zone map: %s", tostring(q.questID),
+      q.title or "?", q.isComplete and " (complete)" or "", q.inArea and " (you're in its area)" or "", fmtLoc(q.loc),
+      b and string.format("%.1f, %.1f", b.x * 100, b.y * 100) or "none on this map",
+      any and string.format("%s (map %s) %.1f, %.1f", any.zone or "?", tostring(any.uiMapId), any.x, any.y) or "none"))
   end
   local pin = QT.PinInfo()
   table.insert(lines, "Pin: " .. (pin and ((pin.title or "?") .. " | " .. fmtLoc(pin.loc)) or "none"))

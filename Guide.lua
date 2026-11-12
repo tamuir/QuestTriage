@@ -156,8 +156,12 @@ end
 -- Read fresh each time: the game moves it as objectives complete, and it can be empty until map data loads.
 local function blizzardMarker(questID)
   local quest = M.DB.GetQuest(questID)
-  local zoneMap = quest and quest.zoneOrSort and quest.zoneOrSort > 0 and M.Zone:GetUiMapIdByAreaId(quest.zoneOrSort)
-  for _, mapID in ipairs({ C_Map.GetBestMapForUnit("player") or zoneMap, zoneMap }) do
+  -- Class and profession quests have a negative zoneOrSort (a category, not a zone): no zone map then.
+  local zone = quest and quest.zoneOrSort
+  local zoneMap = zone and zone > 0 and M.Zone:GetUiMapIdByAreaId(zone) or nil
+  local here = C_Map.GetBestMapForUnit("player")
+  -- Never false in this list: ipairs doesn't stop at false, and GetQuestsOnMap(false) throws.
+  for _, mapID in ipairs({ here or zoneMap, here and zoneMap or nil }) do
     for _, p in ipairs(C_QuestLog.GetQuestsOnMap(mapID) or {}) do
       if p.questID == questID then
         local info = C_Map.GetMapInfo(mapID)
@@ -169,6 +173,12 @@ local function blizzardMarker(questID)
   end
 end
 
+function QT.BlizzardMarker(questID)
+  if not load() then return nil end
+  local ok, marker = pcall(blizzardMarker, questID)
+  return ok and marker or nil
+end
+
 -- Where to go for a quest in your log:
 --   complete            -> the turn-in NPC
 --   inside its area     -> the nearest spawn, which is inside the area you're standing in (never somewhere else)
@@ -177,7 +187,7 @@ end
 function QT.QuestLocation(questID, isComplete, inArea)
   if not load() then return nil end
   if not isComplete and not inArea then
-    local marker = blizzardMarker(questID)
+    local marker = QT.BlizzardMarker(questID)
     if marker then return marker end
   end
   local key = (isComplete and "end:" or inArea and "here:" or "obj:") .. questID

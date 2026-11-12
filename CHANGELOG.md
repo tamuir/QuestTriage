@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.5.4] - 2026-11-13
+
+- Fixed Lua errors that started around level 10 with class quests (and other quests not tied to a zone). The errors stopped the panel from refreshing, so clicking a quest no longer pinned it on the map.
+
 ## [0.5.3] - 2026-11-10
 
 - Two-handed weapons are compared against your weapon and shield (or off-hand) together, so tanking with a shield no longer gets a two-hander pushed at you.
