@@ -13,7 +13,7 @@ jobs:
       - name: Lua 5.1 syntax check and tests
         run: |
           sudo apt-get update -qq && sudo apt-get install -y -qq lua5.1
-          for f in *.lua tools/QuestTriageShots/*.lua; do luac5.1 -p "$f"; done
+          for f in *.lua Libs/*/*.lua tools/QuestTriageShots/*.lua; do luac5.1 -p "$f"; done
           lua5.1 tests.lua
       - name: Release script syntax
         run: bash -n tools/release.sh && sh -n tools/screenshots.sh && sh -n tools/curseforge-description.sh

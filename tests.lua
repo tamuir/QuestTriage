@@ -105,6 +105,14 @@ assert(seedRow and seedRow.style == "item" and seedRow.icon == "blocker" and see
 assert(seedRow.loc == stone and seedRow.pin == "blocker", "the row points where to get the item, not at the altar")
 assert(seedRow.tip[1]:find("^First: Pick up Flawed Power Stone%. Click the Flawed Power Stone at Flawed Power Stone, The Barrens 47%.1, 12%.4"),
   seedRow.tip[1])
+-- Blizzard's quest marker has no NPC name: the tooltip says the zone, never "?".
+do
+  local marker = at(0, 762, nil, "The Barrens"); marker.x, marker.y = 45, 70.7
+  local mt = QT.Triage({ q{ title = "Near", level = 12, questID = 70, loc = at(10, 0) },
+    q{ title = "Trial", level = 12, questID = 71, loc = marker } }, player)
+  local row = has(QT.BuildRows(mt, player, {}, {}), "Trial")
+  assert(row and row.tip[1] == "Go to The Barrens 45.0, 70.7 (762 yd)", row and row.tip[1])
+end
 local firsts = 0
 for _, line in ipairs(seedRow.tip) do if line:find("^First:") then firsts = firsts + 1 end end
 assert(firsts == 1, "the blocker is explained once, not twice")

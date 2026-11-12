@@ -2,6 +2,12 @@
 
 ## [Unreleased]
 
+## [0.5.5] - 2026-11-13
+
+- Fixed Questie errors ("iconData is nil") when hovering Questie's map icons while a Quest Triage pin was set. Quest Triage now ships its own copy of the HereBeDragons map library instead of sharing Questie's, so Questie never sees our pins.
+- Map pins and distances no longer need Questie to be loaded.
+- Quest tooltips no longer say "Go to ?" for spots from Blizzard's quest marker: they name the zone.
+
 ## [0.5.4] - 2026-11-13
 
 - Fixed Lua errors that started around level 10 with class quests (and other quests not tied to a zone). The errors stopped the panel from refreshing, so clicking a quest no longer pinned it on the map.

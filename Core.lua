@@ -827,7 +827,9 @@ function QT.BuildRows(buckets, player, power, opts, groups)
     if q.xp and q.xp > 0 then table.insert(tip, commas(q.xp) .. " XP") end
     local loc = (b.id ~= "later" and b.id ~= "drop") and q.loc or nil
     local function place(l)
-      return (l.name or "?") .. (l.zone and (", " .. l.zone) or "") .. (l.x and string.format(" %.1f, %.1f", l.x, l.y) or "")
+      -- Blizzard's quest marker has no NPC name: just the zone then.
+      local who = l.name and l.zone and (l.name .. ", " .. l.zone) or l.name or l.zone or ""
+      return who .. (l.x and string.format(" %.1f, %.1f", l.x, l.y) or "")
         .. (l.yards and string.format(" (%s yd)", commas(l.yards)) or "")
     end
     if loc then table.insert(tip, 1, (b.id == "turnin" and "Hand in to " or "Go to ") .. place(loc)) end

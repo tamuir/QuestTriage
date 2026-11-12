@@ -6,7 +6,9 @@
 local _, QT = ...
 
 local M -- Questie modules, once ready
-local HBD
+-- Our own bundled copy of HereBeDragons (Libs/), not Questie's: Questie treats every pin in its copy as its own.
+local HBD = LibStub("HereBeDragons-2.0")
+local PINS = LibStub("HereBeDragons-Pins-2.0")
 local locCache = {}  -- [key] = loc without yards/dir; cleared on zone change and quest log change
 
 local function load()
@@ -19,7 +21,6 @@ local function load()
       Zone = QuestieLoader:ImportModule("ZoneDB"),
       AQ = QuestieLoader:ImportModule("AvailableQuests"),
     }
-    HBD = LibStub("HereBeDragonsQuestie-2.0")
     assert(M.DB.GetQuest and M.DU.GetNearestSpawnForQuest and M.DU.GetNearestFinisherOrStarter
       and M.Zone.GetUiMapIdByAreaId and M.AQ.__availableQuests and HBD.GetWorldVector)
   end)
@@ -350,7 +351,7 @@ QT.ICONS = {
   repair = "Repair", bags = "Banker", group = "communities-icon-chat", death = "DeathIcon", hearth = "Innkeeper",
 }
 
--- Where your corpse is, when it's on the map you're on. Works without Questie (no arrow then).
+-- Where your corpse is, when it's on the map you're on. Works without Questie.
 function QT.CorpseLocation()
   local mapID = C_Map.GetBestMapForUnit("player")
   local pos = mapID and C_DeathInfo.GetCorpseMapPosition(mapID)
@@ -358,8 +359,6 @@ function QT.CorpseLocation()
   local x, y = pos:GetXY()
   local info = C_Map.GetMapInfo(mapID)
   local loc = { name = "Your corpse", zone = info and info.name, uiMapId = mapID, x = x * 100, y = y * 100, source = "corpse" }
-  load()
-  if not HBD then return loc end
   loc.wx, loc.wy, loc.inst = HBD:GetWorldCoordinatesFromZone(x, y, mapID)
   return withVector(loc)
 end
@@ -536,11 +535,8 @@ local function makePin(size, second)
 end
 
 function QT.ClearWaypoint()
-  local pins = LibStub("HereBeDragonsQuestie-Pins-2.0", true)
-  if pins then
-    pins:RemoveAllWorldMapIcons("QuestTriage")
-    pins:RemoveAllMinimapIcons("QuestTriage")
-  end
+  PINS:RemoveAllWorldMapIcons("QuestTriage")
+  PINS:RemoveAllMinimapIcons("QuestTriage")
   if nativeIsOurs() then C_Map.ClearUserWaypoint() end
   nativeSet, pinInfo = nil, nil
 end
@@ -549,9 +545,8 @@ end
 -- and open the map there (unless info.quiet). info: { icon = step kind, title, lines = {extra tooltip lines},
 -- questID, after = { loc, title } = a second stop, e.g. where to complete a quest once you have its item }
 function QT.SetWaypoint(loc, info)
-  if not (load() and loc and loc.uiMapId and loc.x) then return false end
-  local pins = LibStub("HereBeDragonsQuestie-Pins-2.0", true)
-  if not pins then return false end
+  if not (loc and loc.uiMapId and loc.x) then return false end
+  local pins = PINS
   QT.ClearWaypoint()
   local after = info and info.after
   if after and not (after.loc and after.loc.uiMapId and after.loc.x) then after = nil end
