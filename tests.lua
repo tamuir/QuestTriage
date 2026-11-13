@@ -442,24 +442,95 @@ do
   assert(not no[1], "offered now (prerequisite done): back in the list")
 end
 
--- Readability: every text color in Core.lua, and the secondary-text gray, reach 7:1 (WCAG AAA) against the panel,
--- even with a white sky showing through it.
+-- Readability: every text color in Core.lua, the secondary-text gray and the game's yellow and white reach 7:1
+-- (WCAG AAA) against the panel even with a white sky showing through it, down to QT.SOLID_ALPHA. Below that the
+-- text is outlined in black, so each color must also reach 7:1 against black.
 do
   local function lin(c) return c <= 0.03928 and c / 12.92 or ((c + 0.055) / 1.055) ^ 2.4 end
   local function lum(t) return 0.2126 * lin(t[1]) + 0.7152 * lin(t[2]) + 0.0722 * lin(t[3]) end
   local function ratio(a, b) local l1, l2 = lum(a), lum(b); if l1 < l2 then l1, l2 = l2, l1 end; return (l1 + 0.05) / (l2 + 0.05) end
-  local bgc = QT.PANEL_BG
-  local bg = { bgc[1] * bgc[4] + (1 - bgc[4]), bgc[2] * bgc[4] + (1 - bgc[4]), bgc[3] * bgc[4] + (1 - bgc[4]) }
-  local src = io.open("Core.lua"):read("*a")
-  local seen = 0
-  for h in src:gmatch('"ff(%x%x%x%x%x%x)"') do
-    local c = { tonumber(h:sub(1, 2), 16) / 255, tonumber(h:sub(3, 4), 16) / 255, tonumber(h:sub(5, 6), 16) / 255 }
-    assert(ratio(c, bg) >= 7, string.format("color %s is only %.1f:1", h, ratio(c, bg)))
-    seen = seen + 1
-  end
-  assert(seen >= 8, "found the palette")
   local g = QT.META_GRAY
-  assert(ratio({ g, g, g }, bg) >= 7, "secondary text gray")
+  local colors = { { g, g, g, "secondary gray" }, { 1, 0.82, 0, "game yellow" }, { 1, 1, 1, "white" } }
+  for h in io.open("Core.lua"):read("*a"):gmatch('"ff(%x%x%x%x%x%x)"') do
+    table.insert(colors, { tonumber(h:sub(1, 2), 16) / 255, tonumber(h:sub(3, 4), 16) / 255, tonumber(h:sub(5, 6), 16) / 255, h })
+  end
+  assert(#colors >= 11, "found the palette")
+  local function overSky(alpha)
+    local c = QT.PANEL_BG
+    return { c[1] * alpha + (1 - alpha), c[2] * alpha + (1 - alpha), c[3] * alpha + (1 - alpha) }
+  end
+  local function worst(bg)
+    local w = 99
+    for _, c in ipairs(colors) do w = math.min(w, ratio(c, bg)) end
+    return w
+  end
+  assert(worst(overSky(QT.SOLID_ALPHA)) >= 7, "plain text at the solid opacity")
+  assert(worst(overSky(QT.SOLID_ALPHA - 0.01)) < 7, "QT.SOLID_ALPHA is the lowest that works, so outlines start right away")
+  assert(worst({ 0, 0, 0 }) >= 7, "every color against its black outline")
+  assert(not QT.NeedsOutline(QT.PANEL_BG[4]), "the default opacity needs no outline")
+  assert(QT.NeedsOutline(0.9) and not QT.NeedsOutline(1))
+end
+
+-- Timed quests come first, whatever the distance, and say how long is left.
+do
+  local t = QT.Triage({ q{ title = "Near", level = 12, questID = 80, loc = at(50, 0) },
+    q{ title = "Need for a Cure", level = 12, questID = 81, loc = at(4000, 0), timeLeft = 700 } }, player)
+  local a = QT.BestActions(t, {}, player)
+  assert(a[1].text == "Go do Need for a Cure" and a[1].sub:find("^12 min left"), a[1].text .. " / " .. tostring(a[1].sub))
+  -- Finished but not handed in: the timer still runs, so the hand-in comes first too.
+  local done = QT.Triage({ q{ title = "Near", level = 12, questID = 80, loc = at(50, 0) },
+    q{ title = "Need for a Cure", level = 12, questID = 81, isComplete = true, loc = at(4000, 0), timeLeft = 30 } }, player)
+  assert(QT.BestActions(done, {}, player)[1].text == "Hand in Need for a Cure")
+  local row = has(QT.BuildRows(QT.Triage({ q{ title = "Near", level = 12, questID = 82, loc = at(10, 0), timeLeft = 30 },
+    q{ title = "Need for a Cure", level = 12, questID = 81, loc = at(40, 0), timeLeft = 700 } }, player), player, {}, {}), "Need for a Cure")
+  assert(row and row.text:find("12 min left"), "the list shows the timer too")
+  assert(QT.TimeLeft(30) == "1 min left" and QT.TimeLeft(61) == "2 min left")
+end
+
+-- Inside quest areas with a timer running.
+do
+  local function timedSet(insideTimed)
+    return QT.Triage({ q{ title = "Here", level = 12, questID = 90, loc = at(5, 0), inArea = true },
+      q{ title = "Cure", level = 12, questID = 91, loc = insideTimed and at(5, 0) or at(3000, 0), inArea = insideTimed or nil,
+        timeLeft = 700 } }, player)
+  end
+  local away = QT.BestActions(timedSet(false), {}, player)
+  assert(away[1].text == "Go do Cure", "a timer elsewhere beats the area you stand in: " .. away[1].text)
+  local both = QT.BestActions(timedSet(true), {}, player)
+  assert(both[1].text == "Do 2 quests here" and both[1].sub:find("^12 min left"), tostring(both[1].sub))
+end
+
+-- Setting "Timed quests first": always (0), under N minutes, or never (-1). The time left always shows.
+do
+  local t = QT.Triage({ q{ title = "Near", level = 12, questID = 80, loc = at(50, 0) },
+    q{ title = "Cure", level = 12, questID = 81, loc = at(4000, 0), timeLeft = 1200 } }, player) -- 20 min left
+  assert(QT.BestActions(t, {}, player, nil, { timedFirst = 0 })[1].text == "Go do Cure")
+  assert(QT.BestActions(t, {}, player, nil, { timedFirst = 30 })[1].text == "Go do Cure", "20 min is under 30")
+  assert(QT.BestActions(t, {}, player, nil, { timedFirst = 15 })[1].text == "Go do Near", "20 min is not under 15")
+  local never = QT.BestActions(t, {}, player, nil, { timedFirst = -1 })
+  assert(never[1].text == "Go do Near")
+  local cure
+  for _, a in ipairs(never) do if a.text == "Go do Cure" then cure = a end end
+  assert(cure and cure.sub:find("^20 min left"), "never first, but the timer still shows")
+end
+
+-- Event quests (Darkmoon Faire): listed with the event's name, never the Next step, even right next to you.
+do
+  local g = QT.PickupGroups({
+    { questID = 60, title = "Small Furry Paws", level = 12, event = "Darkmoon Faire", giver = at(5, 0, "Yebb Neblegear") },
+    { questID = 61, title = "Far Away", level = 12, giver = at(0, 3000, "Hermit") },
+  }, player)
+  local ev
+  for _, x in ipairs(g) do if x.event then ev = x end end
+  assert(ev and ev.giver.name == "Yebb Neblegear", "the event-only giver is flagged")
+  local t = QT.Triage({}, player)
+  assert(QT.BestActions(t, {}, player, g)[1].text == "Pick up Far Away from Hermit", "the event quest next to you is skipped")
+  local row = has(QT.BuildRows(t, player, {}, {}, g), "Small Furry Paws")
+  assert(row and row.text:find("Darkmoon Faire"), "listed, with the event's name")
+  assert(row.tip[#row.tip]:find("^Darkmoon Faire event quest"), row.tip[#row.tip])
+  local mixed = QT.PickupGroups({ { questID = 62, title = "Normal", level = 12, giver = at(5, 0, "Both") },
+    { questID = 63, title = "Event", level = 12, event = "Darkmoon Faire", giver = at(5, 0, "Both") } }, player)
+  assert(not mixed[1].event, "a giver with a normal quest too stays on the route")
 end
 
 print("all tests passed")

@@ -12,8 +12,16 @@ local ICONS = QT.ICONS -- defined in Guide.lua
 local metaFont = CreateFont("QuestTriageFontMeta")
 metaFont:CopyFontObject(GameFontHighlightSmall)
 metaFont:SetTextColor(QT.META_GRAY, QT.META_GRAY, QT.META_GRAY)
+-- The panel's own copies of the game fonts, so the outline below never touches Blizzard's shared ones.
+local function ownFont(name, from)
+  local f = CreateFont(name)
+  f:CopyFontObject(from)
+  return f
+end
+local FONTS = { metaFont, ownFont("QuestTriageFontHero", GameFontNormalMed3),
+  ownFont("QuestTriageFontHeader", GameFontNormal), ownFont("QuestTriageFontItem", GameFontHighlightSmall) }
 
-local DEFAULTS = { style = "batch", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true }
+local DEFAULTS = { style = "batch", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true, openMap = true, timedFirst = 0, bgAlpha = QT.PANEL_BG[4] }
 
 local frame = CreateFrame("Frame", "QuestTriageFrame", UIParent,
   BackdropTemplateMixin and "BackdropTemplate" or nil)
@@ -41,7 +49,18 @@ if frame.SetBackdrop then
 end
 frame:Hide()
 
-local title = frame:CreateFontString(nil, "OVERLAY", "GameFontNormal")
+-- Background opacity (a setting). See-through below QT.SOLID_ALPHA: outline every letter so it stays readable.
+function QT.SetOpacity(alpha)
+  local c = QT.PANEL_BG
+  if frame.SetBackdropColor then frame:SetBackdropColor(c[1], c[2], c[3], alpha) end
+  local flags = QT.NeedsOutline(alpha) and "OUTLINE" or ""
+  for _, f in ipairs(FONTS) do
+    local file, size = f:GetFont()
+    f:SetFont(file, size, flags)
+  end
+end
+
+local title = frame:CreateFontString(nil, "OVERLAY", "QuestTriageFontHeader")
 title:SetPoint("TOPLEFT", 12, -11)
 title:SetText("Quest Triage")
 
@@ -70,7 +89,7 @@ gear:SetScript("OnLeave", GameTooltip_Hide)
 local help = CreateFrame("Button", nil, frame)
 help:SetSize(16, 16)
 help:SetPoint("RIGHT", gear, "LEFT", -4, 0)
-help:SetNormalFontObject("GameFontNormal")
+help:SetNormalFontObject("QuestTriageFontHeader")
 help:SetHighlightFontObject("GameFontHighlight")
 help:SetText("?")
 
@@ -266,11 +285,11 @@ local function getRow(i)
   r.arrow:SetAtlas("UI-HUD-Minimap-Arrow-Player")
   r.arrow:SetSize(28, 28)
   r.arrow:SetPoint("RIGHT", -8, 0)
-  r.text = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  r.text = r:CreateFontString(nil, "OVERLAY", "QuestTriageFontItem")
   r.text:SetJustifyH("LEFT")
   r.sub = r:CreateFontString(nil, "OVERLAY", "QuestTriageFontMeta")
   r.sub:SetJustifyH("LEFT")
-  r.list = r:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
+  r.list = r:CreateFontString(nil, "OVERLAY", "QuestTriageFontItem")
   r.list:SetJustifyH("LEFT")
   r.list:SetSpacing(2)
   r.right = r:CreateFontString(nil, "OVERLAY", "QuestTriageFontMeta")
@@ -296,12 +315,12 @@ end
 
 -- Per style: font, icon size, left inset, gap before the row. Rows are one line except the Next card and notes.
 local STYLE = {
-  hero   = { font = "GameFontNormalMed3", icon = 26, x = 8, gap = 0 },
+  hero   = { font = "QuestTriageFontHero", icon = 26, x = 8, gap = 0 },
   note   = { font = "QuestTriageFontMeta", x = 8, gap = 3 },
-  header = { font = "GameFontNormal", x = 2, gap = 8 },
+  header = { font = "QuestTriageFontHeader", x = 2, gap = 8 },
   zone   = { font = "QuestTriageFontMeta", x = 6, gap = 2 },
-  item   = { font = "GameFontHighlightSmall", icon = 12, x = 6, gap = 1 },
-  alert  = { font = "GameFontHighlightSmall", icon = 12, x = 8, gap = 3 },
+  item   = { font = "QuestTriageFontItem", icon = 12, x = 6, gap = 1 },
+  alert  = { font = "QuestTriageFontItem", icon = 12, x = 8, gap = 3 },
   more   = { font = "QuestTriageFontMeta", x = 24, gap = 0 },
 }
 
@@ -598,7 +617,7 @@ function QT.Render()
     if hearth and QuestTriageCharDB.hearthSkip[hearth.hearth] then hearth = nil end
   end
   local specs = QT.BuildRows(buckets, player, power,
-    { expanded = QuestTriageDB.expanded, style = QuestTriageDB.opts.style,
+    { expanded = QuestTriageDB.expanded, style = QuestTriageDB.opts.style, timedFirst = QuestTriageDB.opts.timedFirst,
       committed = QuestTriageCharDB.committed, death = death, hearth = hearth, fight = QT.ReadTarget(), manaPct = QT.ReadManaPct() },
     pickups and QT.PickupGroups(pickups, player, hidden))
   -- Remember the Next step so it stays Next until done (survives death and /reload).
@@ -738,6 +757,19 @@ local function registerOptions()
     return c:GetData()
   end, "How Quest Triage plans your route.")
 
+  local timedFirst = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_TIMED", "timedFirst", opts, Settings.VarType.Number,
+    "Timed quests first", DEFAULTS.timedFirst)
+  timedFirst:SetValueChangedCallback(function() QT.Render() end)
+  Settings.CreateDropdown(category, timedFirst, function()
+    local c = Settings.CreateControlTextContainer()
+    c:Add(0, "Always", "A timed quest (or its hand-in) is always the next step while its timer runs.")
+    c:Add(30, "Under 30 minutes left")
+    c:Add(15, "Under 15 minutes left")
+    c:Add(5, "Under 5 minutes left")
+    c:Add(-1, "Never", "Timed quests are ranked like any other quest. The time left is still shown.")
+    return c:GetData()
+  end, "When a quest with a timer jumps ahead of everything else.")
+
   local lock = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_LOCKED", "locked", opts, Settings.VarType.Boolean,
     "Lock panel position", DEFAULTS.locked)
   Settings.CreateCheckbox(category, lock, "Stop the panel from being dragged.")
@@ -747,9 +779,13 @@ local function registerOptions()
   Settings.CreateCheckbox(category, junk, "When you open any vendor, sell all gray (Poor) items and show what they made.")
 
   local hearthTips = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_HEARTH", "hearthTips", opts, Settings.VarType.Boolean,
-    "Suggest where to set your hearthstone", DEFAULTS.hearthTips)
+    "Hearthstone tips", DEFAULTS.hearthTips)
   hearthTips:SetValueChangedCallback(function() QT.Render() end)
   Settings.CreateCheckbox(category, hearthTips, "When you're in a town far from where your hearthstone is set, suggest setting it at the inn there.")
+
+  local openMap = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_OPENMAP", "openMap", opts, Settings.VarType.Boolean,
+    "Open the map when pinning", DEFAULTS.openMap)
+  Settings.CreateCheckbox(category, openMap, "Clicking a step opens the world map at its pin. Off: the pin is set quietly (map, minimap and navigation arrow).")
 
   local fade = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_FADE", "fadeInCombat", opts, Settings.VarType.Boolean,
     "Fade in combat", DEFAULTS.fadeInCombat)
@@ -761,6 +797,14 @@ local function registerOptions()
   local sliderOpts = Settings.CreateSliderOptions(0.7, 1.4, 0.05)
   sliderOpts:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(v) return string.format("%d%%", v * 100 + 0.5) end)
   Settings.CreateSlider(category, scale, sliderOpts, "Make the panel bigger or smaller.")
+
+  local bgAlpha = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_BGALPHA", "bgAlpha", opts, Settings.VarType.Number,
+    "Background opacity", DEFAULTS.bgAlpha)
+  bgAlpha:SetValueChangedCallback(function(_, value) QT.SetOpacity(value) end)
+  local alphaOpts = Settings.CreateSliderOptions(0.2, 1, 0.05)
+  alphaOpts:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(v) return string.format("%d%%", v * 100 + 0.5) end)
+  Settings.CreateSlider(category, bgAlpha, alphaOpts,
+    "How much of the game shows through the panel. Below 95% every letter gets a dark outline, so the text stays readable over anything.")
 
   Settings.RegisterAddOnCategory(category)
 end
@@ -829,6 +873,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
       self:SetPoint(p[1], UIParent, p[2], p[3], p[4])
     end
     frame:SetScale(QuestTriageDB.opts.scale)
+    QT.SetOpacity(QuestTriageDB.opts.bgAlpha)
     registerOptions()
     return
   end

@@ -15,6 +15,7 @@ Works with **Questie**: directions, nearby quest givers and monster spawn areas 
 - **Objective checklist** on the card: see what's done and what's left at a glance.
 - **Batch or one at a time.** Clear every quest in a hub before you leave and do nearby objectives in one trip, or finish, hand in, then pick up the next.
 - **Stays on track.** It sticks with the quest you're doing and finishes what you started instead of jumping around.
+- **Timed quests first.** Need for a Cure and other quests with a timer jump to the top, with the minutes left. Prefer them only near the end, or never? It's a setting.
 
 ![The Next card in a quest hub: Hand in Raptor Thieves to Gazrog, 2 more to do here](docs/images/batch-hub.jpg)
 
@@ -25,9 +26,9 @@ Works with **Questie**: directions, nearby quest givers and monster spawn areas 
 **Turn in · Do now · Pick up · Needs a group · Save for later · Drop**, each with a one-line reason. Hover any line for the objectives, the reason and the exact location; click to pin it on your map.
 
 - **Quest items in your bags**: an item that starts a quest you don't have yet becomes the next step, "Open" it.
-- **Nearby quests you haven't picked up yet**, worth doing at your level, nearest first. Talk to a quest giver and it checks what they really offer you: a follow-up you can't take yet drops off the list until you can.
+- **Nearby quests you haven't picked up yet**, worth doing at your level, nearest first. Event quests (Darkmoon Faire and holidays) are listed with the event's name but never pull you off your route. Talk to a quest giver and it checks what they really offer you: a follow-up you can't take yet drops off the list until you can.
 - **Save for later** shows the level to come back at; **Drop** flags grey and failed quests.
-- **Knows the game's quest areas**: inside the white boundary on your minimap it says "do it here".
+- **Knows the game's quest areas**: it points where Blizzard itself marks the quest on your map, and inside the white boundary on your minimap it says "do it here".
 - **Catches blocked quests**: needs an item first? It says where and how to get it, with two map markers.
 - **Real hunting grounds**, not a lone spawn at the edge of the map; if kills are slow, it suggests a denser spot.
 
@@ -41,7 +42,7 @@ Works with **Questie**: directions, nearby quest givers and monster spawn areas 
 
 ## Level faster and get stronger
 
-- **Gear upgrades** from quest rewards and your bags, judged on real stats for your class (never cloth for a Warrior). One click to equip.
+- **Gear upgrades** from quest rewards and your bags, judged on real stats for your class (never cloth for a Warrior). One click to equip. A two-hander has to beat your weapon and shield together, and right-click stops an item you don't want.
 - **Trainer spells** read from your spellbook: it tells you when new spells unlock, so no wasted trips.
 - **Learns from your deaths**: die twice on the same quest and it moves to Save for later.
 - **Death handling**: release, run back with the arrow, resurrect, carry on.
@@ -56,11 +57,11 @@ Works with **Questie**: directions, nearby quest givers and monster spawn areas 
 
 ## Easy to read
 
-Readable colors (7:1 contrast), every line one row, details on hover, adjustable size, and it fades in combat so it never blocks the fight.
+Readable colors (7:1 contrast), every line one row, details on hover, adjustable size and background opacity (see-through text gets a dark outline, so it stays readable over anything), and it fades in combat so it never blocks the fight.
 
-![Quest Triage settings: leveling style Batch (fastest), lock panel position, sell gray items automatically, fade in combat, and panel size](docs/images/settings.png)
+![Quest Triage settings: leveling style Batch (fastest), timed quests first Always, lock panel position, sell gray items automatically, hearthstone tips, open the map when pinning, fade in combat, panel size and background opacity](docs/images/settings.png)
 
-*Simple settings in the game's own Options window: Batch or one at a time, auto-sell greys, lock, size, combat fade.*
+*Simple settings in the game's own Options window: Batch or one at a time, when timed quests go first, auto-sell greys, opening the map when you pin, lock, size, background opacity, combat fade.*
 
 ## How to use
 
@@ -99,10 +100,10 @@ On GitHub: https://github.com/tamuir/QuestTriage/issues. Type `/qt debug`: a win
 
 ## Credits
 
-Directions and quest data come from [Questie](https://github.com/Questie/Questie) and QuestieDB, read at runtime from your own install; Quest Triage contains none of their code or data. Map positions use Questie's copy of HereBeDragons. Thank you to the Questie team and contributors. Open source under [GPL-3.0](LICENSE.md).
+Where to do your quests comes from the game's own quest markers whenever it has them. Quests to pick up, turn-in NPCs, missing items and hunting spots come from [Questie](https://github.com/Questie/Questie) and QuestieDB, read at runtime from your own install; Quest Triage contains none of their code or data. Map pins and distances use [HereBeDragons](https://github.com/Nevcairiel/HereBeDragons) by Nevcairiel (BSD), bundled unmodified with LibStub and CallbackHandler from Ace3 (see [Libs/LICENSES.md](Libs/LICENSES.md)). Thank you to the Questie team and contributors, to Nevcairiel and to the Ace3 team. Open source under [GPL-3.0](LICENSE.md).
 
 ## Development
 
-- Code: `Core.lua` (decisions, no game API, fully tested), `Api.lua` (reads the game), `Guide.lua` (Questie data and map pins), `UI.lua` (panel, events, options).
+- Code: `Core.lua` (decisions, no game API, fully tested), `Api.lua` (reads the game), `Guide.lua` (Questie data, Blizzard quest markers and map pins), `UI.lua` (panel, events, options), `Libs/` (bundled libraries, unmodified).
 - Tests: `sh run-tests.sh` syntax-checks every file and runs `tests.lua` under Lua 5.1 in Docker.
 - Releases: add a dated section such as `## [0.5.1] - 2026-11-10` to `CHANGELOG.md` and push; GitHub Actions runs the tests, tags the version, and uploads the zip to GitHub Releases and CurseForge.

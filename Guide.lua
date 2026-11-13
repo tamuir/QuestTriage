@@ -25,6 +25,11 @@ local function load()
       and M.Zone.GetUiMapIdByAreaId and M.AQ.__availableQuests and HBD.GetWorldVector)
   end)
   if not ok then M = nil end
+  -- Optional: which quests belong to an event (Darkmoon Faire). Without it, pickups just have no event label.
+  if M then
+    local okE, ev = pcall(QuestieLoader.ImportModule, QuestieLoader, "QuestieEvent")
+    M.Event = okE and ev and ev.GetEventNameFor and ev or nil
+  end
   return M ~= nil
 end
 
@@ -313,17 +318,40 @@ function QT.QuestBlockers(questID)
   return out[1] and out or nil
 end
 
+-- Do you carry every item the quest asks you to bring (or needs to start)? Darkmoon Faire hand-ins
+-- ("bring 5 Small Furry Paws") are only worth the walk when you have them.
+local function carriesItems(questID)
+  local ok, obj = pcall(M.DB.QueryQuestSingle, questID, "objectives")
+  local ok2, src = pcall(M.DB.QueryQuestSingle, questID, "requiredSourceItems")
+  for _, o in ipairs(ok and type(obj) == "table" and obj[3] or {}) do
+    if o[1] and C_Item.GetItemCount(o[1]) == 0 then return false end
+  end
+  for _, id in ipairs(ok2 and type(src) == "table" and src or {}) do
+    if C_Item.GetItemCount(id) == 0 then return false end
+  end
+  return true
+end
+
+-- Event quests (Questie shows them only while the event runs): the event's name, or nil.
+local function eventOf(questID)
+  local ok, name = pcall(M.Event and M.Event.GetEventNameFor or function() end, questID)
+  return ok and name and name ~= "" and name or nil
+end
+
 -- Quests you can pick up right now (Questie checks level, race, class, prerequisites, professions),
--- each with where its giver is. Returns a list or nil when the guide is unavailable.
+-- each with where its giver is. Event quests carry .event, and event hand-ins you lack the items for are left out.
+-- Returns a list or nil when the guide is unavailable.
 function QT.ReadPickups()
   if not load() then return nil end
   local list = {}
   for questID in pairs(M.AQ.__availableQuests) do
     local ok, quest = pcall(M.DB.GetQuest, questID)
-    if ok and quest and not quest.isHidden and not helperNotNeeded[questID] and not QuestTriageCharDB.notOffered[questID] then
+    local event = ok and quest and eventOf(questID)
+    if ok and quest and not quest.isHidden and not helperNotNeeded[questID] and not QuestTriageCharDB.notOffered[questID]
+        and not (event and not carriesItems(questID)) then
       local giver = cached("start:" .. questID, function() return M.DU.GetNearestFinisherOrStarter(quest.Starts) end, "quest giver")
       table.insert(list, {
-        questID = questID, title = quest.name, level = quest.level, requiredLevel = quest.requiredLevel,
+        questID = questID, title = quest.name, level = quest.level, requiredLevel = quest.requiredLevel, event = event or nil,
         isGroup = M.DB.IsGroupQuest and M.DB.IsGroupQuest(questID) or M.DB.IsDungeonQuest(questID) or false,
         giver = giver,
       })
@@ -573,7 +601,7 @@ function QT.SetWaypoint(loc, info)
     C_SuperTrack.SetSuperTrackedUserWaypoint(true)
     nativeSet = { m = loc.uiMapId, x = loc.x / 100, y = loc.y / 100 }
   end
-  if OpenWorldMap and not (info and info.quiet) then OpenWorldMap(loc.uiMapId) end
+  if OpenWorldMap and not (info and info.quiet) and QuestTriageDB.opts.openMap then OpenWorldMap(loc.uiMapId) end
   hookNativePins()
   C_Timer.After(0.2, hookNativePins) -- the map makes its pin when it shows
   return true

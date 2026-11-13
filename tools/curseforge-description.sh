@@ -16,7 +16,8 @@ desc=$(tr -d '\r' < README.md | awk '
   /^## Development/ { dev = 1; next }
   dev && /^## / { dev = 0 }
   !dev' |
-  sed -e "s#](docs/images/#]($RAW/docs/images/#g" -e "s#](media/#]($RAW/media/#g" -e "s#](LICENSE.md)#]($REPO/LICENSE.md)#g")
+  sed -e "s#](docs/images/#]($RAW/docs/images/#g" -e "s#](media/#]($RAW/media/#g" \
+    -e "s#](\([^:)\#]*\))#]($REPO/\1)#g") # any other relative link (LICENSE.md, Libs/...): a page on GitHub
 
 if [ "$1" = "--update" ]; then
   printf '%s\n' "$desc" > CURSEFORGE-DESCRIPTION.md

@@ -20,8 +20,12 @@ local function colored(hex, text) return "|c" .. hex .. text .. "|r" end
 
 -- Readability: the panel background and the gray used for secondary text. Every text color in this file is
 -- checked in tests.lua to reach 7:1 contrast (WCAG AAA) against this background, even with a white sky behind it.
-QT.PANEL_BG = { 0.04, 0.04, 0.05, 0.97 } -- r, g, b, alpha
+QT.PANEL_BG = { 0.04, 0.04, 0.05, 0.95 } -- r, g, b, default alpha (the "Background opacity" setting)
 QT.META_GRAY = 0.784                      -- secondary text (#c8c8c8)
+-- The lowest background opacity at which plain text still reaches 7:1 over a white sky (tests.lua checks it).
+-- Below it no text color can promise that, so every letter gets a black outline and reads on any background.
+QT.SOLID_ALPHA = 0.95
+function QT.NeedsOutline(alpha) return alpha < QT.SOLID_ALPHA - 0.001 end
 
 local function isGroupQuest(q)
   local t = lower(q.title)
@@ -311,6 +315,11 @@ function QT.Travel(yards)
   return string.format("~%d min", math.floor(s / 60 + 0.5))
 end
 
+-- "12 min left" for a timed quest; the last minute counts as 1.
+function QT.TimeLeft(seconds)
+  return string.format("%d min left", math.max(1, math.ceil(seconds / 60)))
+end
+
 local function elsewhere(loc, player)
   return loc.zone and player and player.zone and loc.zone ~= player.zone
 end
@@ -401,6 +410,9 @@ function QT.PickupGroups(pickups, player, hidden)
   for _, g in ipairs(groups) do
     table.sort(g.quests, function(a, b) return (a.level or 0) < (b.level or 0) end)
     g.fit = fit(g)
+    -- Only event quests here (Darkmoon Faire): listed, labelled, never on the route. p.event = the event's name.
+    g.event = true
+    for _, p in ipairs(g.quests) do if not p.event then g.event = nil end end
   end
   table.sort(groups, function(a, b)
     local da, db = a.giver.yards or 1e9, b.giver.yards or 1e9
@@ -424,6 +436,7 @@ local function pickupTip(g)
   for _, p in ipairs(g.quests) do
     table.insert(tip, string.format("[%d] %s%s", p.level or 0, p.title or "?", p.isGroup and "  (group)" or ""))
   end
+  if g.event then table.insert(tip, g.quests[1].event .. " event quest: off your leveling route, so never the next step.") end
   return tip
 end
 
@@ -506,7 +519,8 @@ end
 -- Quick fixes (repair, equip) first, then route steps ranked by cost (distance, weighted by style).
 -- A quest you can't finish yet is replaced by the step that unblocks it.
 -- power: { bagUpgrade, train = text, durability, freeSlots, junk }; groups = QT.PickupGroups.
--- opts: { style = "batch"|"single", committed = key of the current Next step, death = see deathStep }
+-- opts: { style = "batch"|"single", committed = key of the current Next step, death = see deathStep,
+--         timedFirst = minutes: 0/nil always put timed quests first, N only under N minutes left, -1 never }
 function QT.BestActions(buckets, power, player, groups, opts)
   opts = opts or {}
   local batch = opts.style ~= "single"
@@ -561,8 +575,28 @@ function QT.BestActions(buckets, power, player, groups, opts)
   end
   local inside = {} -- quests whose game-drawn area you're standing in
 
+  -- A running timer beats every distance: timed quests come first, the soonest to run out first.
+  local timed = {}
+  for _, id in ipairs({ "turnin", "now" }) do
+    for _, e in ipairs(buckets[id]) do
+      if e.quest.timeLeft and e.quest.questID then timed[e.quest.questID] = e.quest.timeLeft end
+    end
+  end
+
   local route = {}
   local function step(cost, a)
+    local left = timed[a.questID or a.pinQuestID or false]
+    for id in pairs(a.questIDs or {}) do -- several quest areas at once: any of them timed counts
+      if timed[id] and (not left or timed[id] < left) then left = timed[id] end
+    end
+    if left then a.sub = QT.TimeLeft(left) .. (a.sub and (" · " .. a.sub) or "") end
+    -- opts.timedFirst (a setting): 0 or nil = always first, N = only under N minutes left, -1 = never.
+    local within = opts.timedFirst
+    if left and (not within or within == 0 or (within > 0 and left <= within * 60)) then
+      a.cost = left - 1e9
+      table.insert(route, a)
+      return
+    end
     if a.key and a.key == opts.committed then
       a.cost = cost * QT.STICKY
       a.committed = true
@@ -582,10 +616,12 @@ function QT.BestActions(buckets, power, player, groups, opts)
   -- One at a time: no new quests while you still have one to finish.
   local wait = (not batch and #buckets.now > 0) and 5e6 or 0
   for i, g in ipairs(groups or {}) do
-    local w = batch and (near(g.giver) and 0.3 or 1.2) or 0.7
-    if near(g.giver) then hereCount = hereCount + 1 end
-    step(yards(g.giver) * w + wait + i, { icon = "pickup", text = pickupText(g), kind = "goto", loc = g.giver, tip = pickupTip(g),
-      giverKey = g.key, key = "pick:" .. g.key, sub = #g.quests > 1 and "Quests at your level" or nil })
+    if not g.event then -- event quests are off the leveling route: only listed, never the Next step
+      local w = batch and (near(g.giver) and 0.3 or 1.2) or 0.7
+      if near(g.giver) then hereCount = hereCount + 1 end
+      step(yards(g.giver) * w + wait + i, { icon = "pickup", text = pickupText(g), kind = "goto", loc = g.giver, tip = pickupTip(g),
+        giverKey = g.key, key = "pick:" .. g.key, sub = #g.quests > 1 and "Quests at your level" or nil })
+    end
   end
   for i, e in ipairs(buckets.now) do
     local q = e.quest
@@ -694,6 +730,7 @@ local function questTag(bucket, q, backAt)
     return colored("ffffa060", (backAt and ("at level " .. backAt)) or (q.deferred and "saved") or ("at level " .. (q.level or 0)))
   end
   local tags = {}
+  if q.timeLeft then table.insert(tags, colored("ffff7a7a", QT.TimeLeft(q.timeLeft))) end
   if q.blockers and q.blockers[1] then table.insert(tags, colored("ffff7a7a", "needs item")) end
   if q.slow then table.insert(tags, colored("ffffa060", "slow")) end
   if q.upgrade then table.insert(tags, colored("ff40ff40", "gear")) end
@@ -898,8 +935,9 @@ function QT.BuildRows(buckets, player, power, opts, groups)
         if g.key ~= nextStep.giverKey then
           local single = #g.quests == 1 and g.quests[1]
           table.insert(pick, { style = "item", icon = "pickup", kind = "goto", loc = g.giver, tip = pickupTip(g),
-            text = single and string.format("[%d] %s", single.level or 0, single.title or "?")
-              or string.format("%s  %s", g.giver.name or "?", colored("ffc8c8c8", #g.quests .. " quests")),
+            text = (single and string.format("[%d] %s", single.level or 0, single.title or "?")
+              or string.format("%s  %s", g.giver.name or "?", colored("ffc8c8c8", #g.quests .. " quests")))
+              .. (g.event and ("  " .. colored("ffc8c8c8", g.quests[1].event)) or ""),
             right = QT.Short(g.giver), questID = single and single.questID or nil })
         end
       end

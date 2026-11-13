@@ -204,6 +204,9 @@ local function readModern()
           upgrade = QT.BestUpgrade(id),
           objectives = {},
         }
+        -- Timed quests (Need for a Cure): seconds left, the same call Blizzard's tracker uses for its timer bar.
+        local total, elapsed = C_QuestLog.GetTimeAllowed(id)
+        if not q.isFailed and total and elapsed and elapsed < total then q.timeLeft = total - elapsed end
         if not q.isComplete then
           q.blockers = QT.QuestBlockers(id)
           -- The game's own quest area (white boundary on the minimap): are you standing in it?

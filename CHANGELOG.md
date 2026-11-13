@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+## [0.5.7] - 2026-11-13
+
+- Timed quests (like Need for a Cure) come first: while the timer runs, the Next step is that quest or its hand-in, whatever else is nearby, and it shows the minutes left. New setting "Timed quests first": always (default), only under 30, 15 or 5 minutes left, or never.
+- Event quests (Darkmoon Faire and other holidays) show in Pick up with the event's name, but never become the Next step: they're off your leveling route. Event hand-ins you don't carry the items for are left out.
+- New setting "Background opacity" (20% to 100%): see more of the game through the panel. Below 95% every letter gets a dark outline, so the text stays readable over bright skies and snow.
+- The setting "Suggest where to set your hearthstone" is now called "Hearthstone tips" (the old name was cut off in the options window).
+- New setting "Open the map when pinning": turn it off and clicking a step just sets the pin (map, minimap and navigation arrow) without opening the map.
+
 ## [0.5.6] - 2026-11-13
 
 - `/qt debug` opens a window with the details already selected: press Ctrl+C and paste them into a bug report. It includes your Quest Triage and Questie versions.
