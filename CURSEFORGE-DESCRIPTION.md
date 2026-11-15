@@ -1,6 +1,6 @@
 **Quest Triage is a leveling guide and quest helper for WoW: Forever that tells you the single best thing to do next.** It reads your quest log, bags, gear and position, then points a live arrow at your next quest, hand-in or pick-up. No route to memorize and no guide to read: one card says what to do now.
 
-Works with **Questie**: directions, nearby quest givers and monster spawn areas come from your Questie install.
+Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn areas come from your Questie install. In English and German.
 
 ![Quest Triage in the Barrens: the Next card says to hand in The Stagnant Oasis to Tonga Runetotem, about 2 minutes north-west, worth 13% of a level, above the sorted quest lists](https://raw.githubusercontent.com/tamuir/QuestTriage/main/docs/images/next-step.jpg)
 
@@ -67,6 +67,10 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 - **Shift-click a quest:** link it in chat.
 - **Right-click a line:** show on map, open in quest log, share with party, save for later (until a level you pick, or until you bring it back), hide, abandon (Drop list), try again.
 - **Click an Equip step:** puts the item on.
+- **The - button** folds the panel to just the Next card; **+** brings the lists back.
+- **Closed it?** Bring it back from the minimap's addon menu (right-click there for the settings), with `/qt`, or with a key.
+- **Keys** (Options > Keybindings > AddOns): show or hide the panel, and go to the next step (same as clicking the card).
+- **At the reward window** it names the choice that's a clear upgrade for you, in chat. The pick stays yours.
 
 | Command | What it does |
 | --- | --- |
@@ -80,7 +84,10 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 ## FAQ
 
 **Does it work without Questie?**
-Yes. It still sorts your quest log and checks gear, trainers, deaths and quest areas. Directions, nearby pick-ups and spawn areas need [Questie](https://www.curseforge.com/wow/addons/questie).
+Yes. It still sorts your quest log, points the arrow at Blizzard's own quest markers (hand-ins too), and checks gear, trainers, deaths and quest areas. Nearby pick-ups, turn-in NPC names, missing items and spawn areas need [Questie](https://www.curseforge.com/wow/addons/questie).
+
+**Which languages?**
+English and German. Anything not translated yet shows in English.
 
 **Which game versions are supported?**
 WoW: Forever. Other versions aren't tested yet.

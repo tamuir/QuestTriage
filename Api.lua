@@ -10,13 +10,14 @@ local function parseCount(text)
   return nil, nil
 end
 
+-- The quest's tag id (Enum.QuestTag: dungeon, raid, PvP...) and elite flag. Ids, not names: names are translated.
 local function questTag(questID)
   local fn = C_QuestLog and C_QuestLog.GetQuestTagInfo or GetQuestTagInfo
   if not questID or not fn then return nil end
-  local ok, a, b = pcall(fn, questID)
+  local ok, a = pcall(fn, questID)
   if not ok then return nil end
-  if type(a) == "table" then return a.tagName end -- newer API returns a table
-  return b -- classic: tagID, tagName
+  if type(a) == "table" then return a.tagID, a.isElite end -- newer API returns a table
+  return a -- classic: tagID, tagName
 end
 
 local function readClassic()
@@ -32,7 +33,7 @@ local function readClassic()
         suggestedGroup = tonumber(suggestedGroup) or 0,
         isComplete = (isComplete == 1 or isComplete == true),
         isFailed = (isComplete == -1),
-        tag = questTag(questID),
+        tagID = questTag(questID),
         objectives = {},
       }
       local numObj = GetNumQuestLeaderBoards(i) or 0
@@ -58,8 +59,10 @@ local SLOTS = {
   INVTYPE_WEAPONOFFHAND = { 17 }, INVTYPE_SHIELD = { 17 }, INVTYPE_HOLDABLE = { 17 },
   INVTYPE_RANGED = { 18 }, INVTYPE_RANGEDRIGHT = { 18 }, INVTYPE_THROWN = { 18 }, INVTYPE_RELIC = { 18 },
 }
-local SLOT_NAMES = { "head", "neck", "shoulders", nil, "chest", "waist", "legs", "feet", "wrists", "hands",
-  "ring", "ring", "trinket", "trinket", "back", "main hand", "off hand", "ranged" }
+-- The game's own slot names, so they come translated.
+local SLOT_NAMES = { INVTYPE_HEAD, INVTYPE_NECK, INVTYPE_SHOULDER, nil, INVTYPE_CHEST, INVTYPE_WAIST, INVTYPE_LEGS,
+  INVTYPE_FEET, INVTYPE_WRIST, INVTYPE_HAND, INVTYPE_FINGER, INVTYPE_FINGER, INVTYPE_TRINKET, INVTYPE_TRINKET,
+  INVTYPE_CLOAK, INVTYPE_WEAPONMAINHAND, INVTYPE_WEAPONOFFHAND, INVTYPE_RANGED }
 
 -- Is this item better for your class than what you wear? Returns { name, link, score, change, slot } or nil.
 -- Uses the item's real stats and an armor-type check (QT.GearUpgrade in Core.lua), not item level.
@@ -103,6 +106,18 @@ function QT.BestUpgrade(questID)
   return best
 end
 
+-- At the quest reward window: the choice that's the biggest upgrade for you, or nil when none clearly is.
+function QT.BestRewardChoice()
+  local best
+  for i = 1, GetNumQuestChoices() or 0 do
+    local usable = select(5, GetQuestItemInfo("choice", i))
+    local link = usable and GetQuestItemLink("choice", i)
+    local up = link and upgradeOver(link)
+    if better(up, best) then best = up end
+  end
+  return best
+end
+
 -- Things outside the quest log that make you stronger or faster right now. See QT.BestActions.
 function QT.ReadPower(level)
   local p = { freeSlots = 0, junk = 0 }
@@ -115,7 +130,7 @@ function QT.ReadPower(level)
         local qi = C_Container.GetContainerItemQuestInfo(bag, slot)
         if qi and qi.questID and not qi.isActive and not p.bagQuest and not QuestTriageCharDB.hidden[qi.questID]
             and not C_QuestLog.IsQuestFlaggedCompleted(qi.questID) then
-          p.bagQuest = { questID = qi.questID, link = info.hyperlink, name = C_Item.GetItemNameByID(info.itemID) or "the quest item" }
+          p.bagQuest = { questID = qi.questID, link = info.hyperlink, name = C_Item.GetItemNameByID(info.itemID) or QT.L["the quest item"] }
         end
         if info.quality == 0 and not info.hasNoValue then
           p.junk = p.junk + 1
@@ -198,12 +213,12 @@ local function readModern()
           suggestedGroup = info.suggestedGroup or 0,
           isComplete = C_QuestLog.IsComplete and C_QuestLog.IsComplete(id) or false,
           isFailed = C_QuestLog.IsFailed and C_QuestLog.IsFailed(id) or false,
-          tag = questTag(id),
           isTrivial = C_QuestLog.IsQuestTrivial and (C_QuestLog.IsQuestTrivial(id) == true),
           xp = GetQuestLogRewardXP and GetQuestLogRewardXP(id) or nil,
           upgrade = QT.BestUpgrade(id),
           objectives = {},
         }
+        q.tagID, q.isElite = questTag(id)
         -- Timed quests (Need for a Cure): seconds left, the same call Blizzard's tracker uses for its timer bar.
         local total, elapsed = C_QuestLog.GetTimeAllowed(id)
         if not q.isFailed and total and elapsed and elapsed < total then q.timeLeft = total - elapsed end
@@ -213,7 +228,7 @@ local function readModern()
           q.inArea = C_Minimap and C_Minimap.IsInsideQuestBlob and C_Minimap.IsInsideQuestBlob(id) or nil
         end
         -- Decided after inArea: inside the area, the location is the nearest spawn there, never elsewhere.
-        q.loc = QT.QuestLocation(id, q.isComplete, q.inArea)
+        q.loc = QT.QuestLocation(id, q.isComplete, q.inArea, header)
         local c = GetQuestDifficultyColor and GetQuestDifficultyColor(q.level or 0)
         if c then q.color = string.format("ff%02x%02x%02x", c.r * 255, c.g * 255, c.b * 255) end
         local objs = C_QuestLog.GetQuestObjectives and C_QuestLog.GetQuestObjectives(id) or {}

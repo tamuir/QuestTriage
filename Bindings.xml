@@ -1,0 +1,8 @@
+<Bindings>
+  <Binding name="QUESTTRIAGE_TOGGLE" header="QUESTTRIAGE" category="ADDONS">
+    QuestTriage.Toggle()
+  </Binding>
+  <Binding name="QUESTTRIAGE_NEXT" category="ADDONS">
+    QuestTriage.DoNext()
+  </Binding>
+</Bindings>

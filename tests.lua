@@ -103,7 +103,7 @@ local seedRow = has(br, "The Demon Seed")
 assert(seedRow and seedRow.style == "item" and seedRow.icon == "blocker" and seedRow.text:find("needs item"),
   "the blocked quest stays listed with its warning")
 assert(seedRow.loc == stone and seedRow.pin == "blocker", "the row points where to get the item, not at the altar")
-assert(seedRow.tip[1]:find("^First: Pick up Flawed Power Stone%. Click the Flawed Power Stone at Flawed Power Stone, The Barrens 47%.1, 12%.4"),
+assert(seedRow.tip[1]:find("^First: Pick up Flawed Power Stone%. Click the Flawed Power Stone%. At: Flawed Power Stone, The Barrens 47%.1, 12%.4"),
   seedRow.tip[1])
 -- Blizzard's quest marker has no NPC name: the tooltip says the zone, never "?".
 do
@@ -341,6 +341,9 @@ local s = QT.Stats({
 })
 assert(s.done == 2 and s.dropped == 1 and s.judged == 3 and s.followed == 2 and s.avgMinutes == 15)
 assert(#QT.FormatStats(s) == 3)
+-- Saved for later, then done once your level caught up: that followed the advice.
+s = QT.Stats({ [1] = { result = "done", bucket = "later", last = "now" }, [2] = { result = "done", bucket = "now", last = "later" } })
+assert(s.judged == 2 and s.followed == 1, "judged on the advice just before it was finished")
 
 -- Checklist: every objective, done ones checked, so you see what's finished and what's left.
 local multi = q{ title = "The Disruption Ends", level = 12, questID = 30, loc = at(100, 0), objectives = {
@@ -536,6 +539,68 @@ do
   local mixed = QT.PickupGroups({ { questID = 62, title = "Normal", level = 12, giver = at(5, 0, "Both") },
     { questID = 63, title = "Event", level = 12, event = "Darkmoon Faire", giver = at(5, 0, "Both") } }, player)
   assert(not mixed[1].event, "a giver with a normal quest too stays on the route")
+end
+
+-- Group and PvP quests by tag id, the same in every language (Enum.QuestTag: 41 PvP, 81 Dungeon).
+assert(QT.Classify(q{ title = "Kriegshymnenschlucht", level = 12, tagID = QT.PVP_TAG }, player) == "group")
+assert(select(2, QT.Classify(q{ title = "WSG", level = 12, tagID = QT.PVP_TAG }, player)):find("battleground"))
+assert(QT.Classify(q{ title = "Die Todesminen", level = 12, tagID = 81 }, player) == "group")
+assert(QT.Classify(q{ title = "Ogre", level = 12, isElite = true }, player) == "group")
+assert(QT.Classify(q{ title = "Plain", level = 12, tagID = 102 }, player) == "now", "an account tag is not a group")
+
+-- Pick-ups: only givers within range, but always the nearest few.
+do
+  local list = {}
+  for i = 1, 6 do table.insert(list, { questID = 70 + i, title = "Q" .. i, level = 12, giver = at(0, i * 1000, "Giver" .. i) }) end
+  local g = QT.PickupGroups(list, player)
+  assert(#g == 3 and g[1].giver.name == "Giver1" and g[3].giver.name == "Giver3", "far ones dropped, nearest three kept")
+  table.insert(list, { questID = 80, title = "Near", level = 12, giver = at(0, 100, "Near") })
+  table.insert(list, { questID = 81, title = "Near2", level = 12, giver = at(0, 200, "Near2") })
+  table.insert(list, { questID = 82, title = "Near3", level = 12, giver = at(0, 300, "Near3") })
+  table.insert(list, { questID = 83, title = "Near4", level = 12, giver = at(0, 400, "Near4") })
+  g = QT.PickupGroups(list, player)
+  assert(#g == 5 and g[5].giver.name == "Giver1", "everyone within 1500 yd, nothing beyond once there are enough")
+end
+
+-- Compact panel: the Next step and its notes, no lists.
+do
+  local t = QT.Triage({ q{ title = "One", level = 12, questID = 90, loc = at(100, 0) }, q{ title = "Two", level = 12, questID = 91, loc = at(900, 0) } }, player)
+  local full, compact = QT.BuildRows(t, player, {}, {}), QT.BuildRows(t, player, {}, { compact = true })
+  assert(has(full, "Two") and not has(compact, "Two") and compact[1].style == "hero")
+  for _, r in ipairs(compact) do assert(r.style ~= "header", "no section headers in compact") end
+end
+
+-- Translations: every German text keeps the English one's format codes in order, every text in the code has a
+-- German one, and none is left over from text the code no longer uses.
+do
+  local function codes(s) local t = {} for c in s:gmatch("%%[%d%.%-]*[dsf%%]") do t[#t + 1] = c end return table.concat(t, " ") end
+  local ns = {}
+  _G.GetLocale = function() return "deDE" end
+  assert(loadfile("Locales/deDE.lua"))("QuestTriage", ns)
+  _G.GetLocale = nil
+  local used = { Innkeeper = true, Repair = true } -- looked up by Questie's townsfolk kind (Guide.lua: L[kind])
+  for _, f in ipairs({ "Core.lua", "Api.lua", "Guide.lua", "UI.lua" }) do
+    local fh = assert(io.open(f))
+    local src = fh:read("*a")
+    fh:close()
+    for _, pat in ipairs({ 'L%["(.-)"%]', "L%['(.-)'%]" }) do
+      for k in src:gmatch(pat) do used[k] = true; assert(ns.L[k], "no German for: " .. k) end
+    end
+  end
+  for k, v in pairs(ns.L) do
+    assert(used[k], "German for text the code no longer uses: " .. k)
+    assert(codes(k) == codes(v), "format codes differ: " .. k)
+  end
+  -- The whole panel builds in German.
+  local DE = assert(loadfile("Core.lua"))("QuestTriage", ns)
+  local t = DE.Triage({ q{ title = "Eins", level = 12, questID = 1, loc = at(700, 0, "Raptoren") },
+    q{ title = "Zwei", level = 14, questID = 2, loc = at(720, 30, "Raptoren"), xp = 1200 },
+    q{ title = "Fertig", level = 12, questID = 3, isComplete = true, loc = at(50, 0, "Gornek") } }, player)
+  local rows = DE.BuildRows(t, player, { train = "x", durability = 20, freeSlots = 1, junk = 2 }, {},
+    DE.PickupGroups({ { questID = 9, title = "Neu", level = 12, giver = at(100, 0, "Gornek") } }, player))
+  assert(rows[1].text == "Fertig abgeben" and has(rows, "^Außerdem: "), rows[1].text)
+  assert(DE.Commas(12345) == "12.345" and DE.Short({ yards = 770, dir = "O" }) == "~2 Min. O")
+  _G.QuestTriage = QT -- loading Core again replaced it
 end
 
 print("all tests passed")

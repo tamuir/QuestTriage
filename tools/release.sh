@@ -12,7 +12,7 @@ toc="$root/QuestTriage.toc"
 out="$root/.release"
 zip="QuestTriage-v$version.zip"
 
-# The zip holds only what the game loads: the TOC, the Lua files it lists, the icon, the license and the bundled libraries' licenses.
+# The zip holds only what the game loads: the TOC, the Lua files it lists, Bindings.xml, the icon, the license and the bundled libraries' licenses.
 rm -rf "$out"
 mkdir -p "$out/QuestTriage/media"
 cp "$toc" "$out/QuestTriage/"
@@ -22,7 +22,7 @@ grep -vE '^[[:space:]]*(#|$)' "$toc" | tr -d '\r' | tr '\\' / | while read -r fi
   cp "$root/$file" "$out/QuestTriage/$file"
 done
 cp "$root/media/icon-64.png" "$out/QuestTriage/media/"
-cp "$root/LICENSE.md" "$out/QuestTriage/"
+cp "$root/LICENSE.md" "$root/Bindings.xml" "$out/QuestTriage/"
 cp "$root/Libs/LICENSES.md" "$out/QuestTriage/Libs/"
 sed -i "s/@project-version@/$version/" "$out/QuestTriage/QuestTriage.toc"
 (cd "$out" && zip -qr "$zip" QuestTriage)

@@ -3,13 +3,18 @@
 local _, QT = ...
 QT = QT or {}
 
+-- Translations: the English text is the key, a file in Locales/ (loaded before this one) fills QT.L for its
+-- language, and any text it doesn't translate shows in English.
+local L = setmetatable(QT.L or {}, { __index = function(_, k) return k end })
+QT.L = L
+
 -- Bucket ids, in the order they are shown. limit = rows shown before folding (nil = all).
 QT.BUCKETS = {
-  { id = "turnin", label = "Turn in",           color = "ff40ff40" },
-  { id = "now",    label = "Do now",            color = "ffffd100", limit = 5 },
-  { id = "group",  label = "Needs a group",     color = "ff7ec4ff" },
-  { id = "later",  label = "Save for later",    color = "ffffa060", limit = 0 },
-  { id = "drop",   label = "Drop",              color = "ffb8b8b8", limit = 0 },
+  { id = "turnin", label = L["Turn in"],        color = "ff40ff40" },
+  { id = "now",    label = L["Do now"],         color = "ffffd100", limit = 5 },
+  { id = "group",  label = L["Needs a group"],  color = "ff7ec4ff" },
+  { id = "later",  label = L["Save for later"], color = "ffffa060", limit = 0 },
+  { id = "drop",   label = L["Drop"],           color = "ffb8b8b8", limit = 0 },
 }
 
 -- How far above you a quest can be before we call it "later".
@@ -27,10 +32,14 @@ QT.META_GRAY = 0.784                      -- secondary text (#c8c8c8)
 QT.SOLID_ALPHA = 0.95
 function QT.NeedsOutline(alpha) return alpha < QT.SOLID_ALPHA - 0.001 end
 
+-- Enum.QuestTag ids (checked in the 1.60.1 API docs): the same in every language, unlike the tag's name.
+local GROUP_TAGS = { [1] = true, [62] = true, [81] = true, [85] = true, [88] = true, [89] = true } -- Group, Raid, Dungeon, Heroic, Raid10, Raid25
+QT.PVP_TAG = 41
+
 local function isGroupQuest(q)
   local t = lower(q.title)
   if t:find("%(dungeon%)") or t:find("%(raid%)") or t:find("%(elite%)") then return true end
-  if q.tag and (q.tag == "Dungeon" or q.tag == "Raid" or q.tag == "Elite" or q.tag == "Group") then return true end
+  if (q.tagID and GROUP_TAGS[q.tagID]) or q.isElite then return true end
   if q.suggestedGroup and q.suggestedGroup > 1 then return true end
   return false
 end
@@ -63,40 +72,44 @@ local function classifyBase(q, player)
   local greyBelow = pl - (player.greenRange or 5)
 
   if q.isFailed then
-    return "drop", "Failed. Abandon it, and pick it up again if you pass the quest giver."
+    return "drop", L["Failed. Abandon it, and pick it up again if you pass the quest giver."]
   end
   if q.isComplete then
     return "turnin", ""
   end
   -- Trust the game's own grey flag; level math is only the fallback.
   if q.isTrivial or (q.isTrivial == nil and ql < greyBelow) then
-    return "drop", string.format("Grey for you (level %d). Almost no XP left.", ql)
+    return "drop", L["Grey for you (level %d). Almost no XP left."]:format(ql)
   end
   -- You chose to save it for later: respect that until the level you picked (or until you bring it back).
   local df = q.deferred
   if df and (not df.untilLevel or pl < df.untilLevel) then
-    return "later", df.untilLevel and string.format("You saved this for later. It comes back at level %d.", df.untilLevel)
-      or "You saved this for later. Right-click it to bring it back.", df.untilLevel
+    return "later", df.untilLevel and L["You saved this for later. It comes back at level %d."]:format(df.untilLevel)
+      or L["You saved this for later. Right-click it to bring it back."], df.untilLevel
   end
   -- Your own deaths are the best evidence: dying twice on it at this level means it's too hard right now.
   local dd = q.deaths
   if dd and dd.level == pl and dd.count >= QT.DEATHS_BEFORE_LATER then
     local back = math.max(pl + 2, ql)
-    return "later", string.format("You died %d times on this at level %d. Come back at %d, or bring a friend.",
+    return "later", L["You died %d times on this at level %d. Come back at %d, or bring a friend."]:format(
       dd.count, pl, back), back
+  end
+  -- Battlegrounds: off the questing route, like a dungeon.
+  if q.tagID == QT.PVP_TAG then
+    return "group", L["PvP quest: done in a battleground."]
   end
   if isGroupQuest(q) then
     if diff > QT.MAX_LEVELS_ABOVE + 2 then
-      return "later", string.format("Group quest, level %d. Come back at %d with a group.", ql, ql - 2), ql - 2
+      return "later", L["Group quest, level %d. Come back at %d with a group."]:format(ql, ql - 2), ql - 2
     end
-    return "group", "Dungeon or elite. Look for a group in chat."
+    return "group", L["Dungeon or elite. Look for a group in chat."]
   end
   if diff > QT.MAX_LEVELS_ABOVE then
     local back = ql - QT.MAX_LEVELS_ABOVE
-    return "later", string.format("Too hard now. Come back at level %d.", back), back
+    return "later", L["Too hard now. Come back at level %d."]:format(back), back
   end
   if diff == QT.MAX_LEVELS_ABOVE then
-    return "now", "Hard: pull one mob at a time."
+    return "now", L["Hard: pull one mob at a time."]
   end
   return "now", ""
 end
@@ -187,7 +200,7 @@ end
 -- up: { name, change = "+3 Strength, ...", slot }  change is nil when the slot is empty.
 function QT.UpgradeNote(up)
   if up.change then return up.change .. ", " .. up.slot end
-  return string.format("fills your empty %s slot", up.slot)
+  return L["fills your empty %s slot"]:format(up.slot)
 end
 
 -- q.blockers (optional, from Guide.lua): { {text = "Pick up Flawed Power Stone", loc}, ... } = what's missing to finish it.
@@ -195,13 +208,13 @@ function QT.Classify(q, player)
   local bucket, reason, backAt = classifyBase(q, player)
   if bucket == "now" and q.blockers and q.blockers[1] then
     local b = q.blockers[1]
-    reason = "First: " .. b.text .. "." .. (b.how and (" " .. b.how .. ".") or "") .. (reason ~= "" and (" " .. reason) or "")
+    reason = L["First: %s."]:format(b.text) .. (b.how and (" " .. b.how .. ".") or "") .. (reason ~= "" and (" " .. reason) or "")
   end
   local up = q.upgrade
   if not up or q.isFailed then return bucket, reason, backAt end
-  local note = "Gear upgrade: " .. up.name .. " (" .. QT.UpgradeNote(up) .. ")."
+  local note = L["Gear upgrade: %s (%s)."]:format(up.name, QT.UpgradeNote(up))
   if bucket == "drop" then
-    return "now", "Grey, but worth it. " .. note
+    return "now", L["Grey, but worth it."] .. " " .. note
   end
   return bucket, reason == "" and note or (reason .. " " .. note), backAt
 end
@@ -248,8 +261,9 @@ end
 
 local function commas(n)
   local s = tostring(math.floor(n))
+  local sep = L[","] -- the thousands separator: "." in German
   while true do
-    local r, k = s:gsub("^(-?%d+)(%d%d%d)", "%1,%2")
+    local r, k = s:gsub("^(-?%d+)(%d%d%d)", "%1" .. sep .. "%2")
     s = r
     if k == 0 then return s end
   end
@@ -270,10 +284,12 @@ function QT.TrainerAdvice(book, trainer, level)
   elseif book then
     count = book.ready
   elseif trainer and trainer.nextLevel and level >= trainer.nextLevel then
-    return "New spells unlocked: visit your class trainer.", nextLevel
+    return L["New spells unlocked: visit your class trainer."], nextLevel
   end
   if count and count > 0 then
-    return string.format("Learn %d new spell%s at your class trainer.", count, count > 1 and "s" or ""), nextLevel
+    -- shortcut: one and many only; languages with more plural forms (Russian) need a third string.
+    return count == 1 and L["Learn 1 new spell at your class trainer."]
+      or L["Learn %d new spells at your class trainer."]:format(count), nextLevel
   end
   return nil, nextLevel
 end
@@ -302,7 +318,7 @@ function QT.Checklist(q)
 end
 
 -- Angle from Questie's map library (radians, 0 = north, counter-clockwise) -> compass word.
-local COMPASS = { "N", "NW", "W", "SW", "S", "SE", "E", "NE" }
+local COMPASS = { L["N"], L["NW"], L["W"], L["SW"], L["S"], L["SE"], L["E"], L["NE"] }
 function QT.Compass(angle)
   return COMPASS[math.floor((angle % (2 * math.pi)) / (math.pi / 4) + 0.5) % 8 + 1]
 end
@@ -311,13 +327,13 @@ end
 QT.RUN_SPEED = 7
 function QT.Travel(yards)
   local s = yards / QT.RUN_SPEED
-  if s < 60 then return "<1 min" end
-  return string.format("~%d min", math.floor(s / 60 + 0.5))
+  if s < 60 then return L["<1 min"] end
+  return L["~%d min"]:format(math.floor(s / 60 + 0.5))
 end
 
 -- "12 min left" for a timed quest; the last minute counts as 1.
 function QT.TimeLeft(seconds)
-  return string.format("%d min left", math.max(1, math.ceil(seconds / 60)))
+  return L["%d min left"]:format(math.max(1, math.ceil(seconds / 60)))
 end
 
 local function elsewhere(loc, player)
@@ -328,7 +344,7 @@ end
 function QT.Short(loc)
   if not loc then return nil end
   if not loc.yards then return loc.zone end
-  if loc.yards <= 25 then return "here" end
+  if loc.yards <= 25 then return L["here"] end
   return QT.Travel(loc.yards) .. (loc.dir and (" " .. loc.dir) or "")
 end
 
@@ -374,9 +390,9 @@ function QT.HearthTip(bind, inn, zoneText, knows)
   end
   return { style = "item", icon = "hearth", kind = "goto", loc = inn,
     hearth = (inn.name or "?") .. "|" .. (inn.zone or ""),
-    text = "Set your hearthstone here (now " .. bind.name .. ")",
-    tip = { "Talk to " .. (inn.name or "the innkeeper") .. " and choose \"Make this inn your home\".",
-      "Your hearthstone then brings you back to this town." } }
+    text = L["Set your hearthstone here (now %s)"]:format(bind.name),
+    tip = { L["Talk to %s and choose to make this inn your home."]:format(inn.name or L["the innkeeper"]),
+      L["Your hearthstone then brings you back to this town."] } }
 end
 
 -- What a quest giver actually offers beats Questie's guess. starters = { [questID] = { npcID, ... } } for the
@@ -389,6 +405,9 @@ function QT.MarkOffered(starters, npcID, offered, notOffered)
     end
   end
 end
+
+QT.PICKUP_RANGE = 1500 -- yards, about 3.5 minutes on foot
+QT.PICKUP_MIN = 3
 
 -- Quests you can pick up, grouped by giver: nearest first, then closest to your level.
 -- Only ones worth doing now: required level met, not grey, at most MAX_LEVELS_ABOVE over you.
@@ -424,24 +443,30 @@ function QT.PickupGroups(pickups, player, hidden)
     if da ~= db then return da < db end
     return a.fit < b.fit
   end)
-  return groups
+  -- Only givers within PICKUP_RANGE, but always the nearest few, so you know where to head next.
+  local kept = {}
+  for i, g in ipairs(groups) do
+    if i <= QT.PICKUP_MIN or (g.giver.yards and g.giver.yards <= QT.PICKUP_RANGE) then table.insert(kept, g) end
+  end
+  return kept
 end
 
 local function pickupText(g)
   local q = g.quests
   if #q == 1 then
     -- Objects often share the quest's name ("Flawed Power Stone"): don't say it twice.
-    return "Pick up " .. q[1].title .. ((g.giver.name and g.giver.name ~= q[1].title) and (" from " .. g.giver.name) or "")
+    if g.giver.name and g.giver.name ~= q[1].title then return L["Pick up %s from %s"]:format(q[1].title, g.giver.name) end
+    return L["Pick up %s"]:format(q[1].title)
   end
-  return string.format("Pick up %d quests from %s", #q, g.giver.name or "?")
+  return L["Pick up %d quests from %s"]:format(#q, g.giver.name or "?")
 end
 
 local function pickupTip(g)
   local tip = {}
   for _, p in ipairs(g.quests) do
-    table.insert(tip, string.format("[%d] %s%s", p.level or 0, p.title or "?", p.isGroup and "  (group)" or ""))
+    table.insert(tip, string.format("[%d] %s%s", p.level or 0, p.title or "?", p.isGroup and ("  " .. L["(group)"]) or ""))
   end
-  if g.event then table.insert(tip, g.quests[1].event .. " event quest: off your leveling route, so never the next step.") end
+  if g.event then table.insert(tip, L["%s event quest: off your leveling route, so never the next step."]:format(g.quests[1].event)) end
   return tip
 end
 
@@ -454,14 +479,14 @@ QT.CLUSTER_RADIUS = 400 -- yards: objectives this close count as one trip
 -- death = { ghost = bool, corpse = loc or nil }
 local function deathStep(death)
   if not death.ghost then
-    return { icon = "death", text = "Release your spirit", sub = "Then run back to your corpse" }
+    return { icon = "death", text = L["Release your spirit"], sub = L["Then run back to your corpse"] }
   end
   local c = death.corpse
   if c and c.yards and c.yards <= 40 then
-    return { icon = "death", text = "Resurrect at your corpse", sub = "Accept the prompt on screen" }
+    return { icon = "death", text = L["Resurrect at your corpse"], sub = L["Accept the prompt on screen"] }
   end
-  return { icon = "death", text = "Run back to your corpse", kind = c and "goto" or nil, loc = c,
-    sub = "Your quests wait until you're back" }
+  return { icon = "death", text = L["Run back to your corpse"], kind = c and "goto" or nil, loc = c,
+    sub = L["Your quests wait until you're back"] }
 end
 
 -- Once a step is the Next one it stays, unless another becomes much better (costs less than half).
@@ -535,24 +560,25 @@ function QT.BestActions(buckets, power, player, groups, opts)
   local d = power.durability
   local r = power.repairAt -- nearest repair vendor, when gear is low
   if d and d == 0 then
-    add({ icon = "repair", text = "Repair your gear", kind = r and "goto" or nil, loc = r,
-      sub = "Broken gear gives you no stats" .. (r and r.name and (" · at " .. r.name) or "") })
+    add({ icon = "repair", text = L["Repair your gear"], kind = r and "goto" or nil, loc = r,
+      sub = L["Broken gear gives you no stats"] .. (r and r.name and (" · " .. L["at %s"]:format(r.name)) or "") })
   end
   local up = power.bagUpgrade
   if up then
-    add({ icon = "equip", text = "Equip " .. up.name, kind = "equip", data = up.link,
-      sub = up.change and (up.change .. " · already in your bags") or "Fills an empty slot" })
+    add({ icon = "equip", text = L["Equip %s"]:format(up.name), kind = "equip", data = up.link,
+      sub = up.change and (up.change .. " · " .. L["already in your bags"]) or L["Fills an empty slot"] })
   end
   local bq = power.bagQuest
   if bq then
-    add({ icon = "pickup", text = "Open " .. bq.name, kind = "bags", data = bq.link, questID = bq.questID,
-      sub = "In your bags: right-click it to start its quest" })
+    add({ icon = "pickup", text = L["Open %s"]:format(bq.name), kind = "bags", data = bq.link, questID = bq.questID,
+      sub = L["In your bags: right-click it to start its quest"] })
   end
   if power.train then table.insert(reminders, power.train) end
-  if d and d > 0 and d < 25 and not r then table.insert(reminders, string.format("Repair soon (gear at %d%%)", d)) end
+  if d and d > 0 and d < 25 and not r then table.insert(reminders, L["Repair soon (gear at %d%%)"]:format(d)) end
   if power.freeSlots and power.freeSlots <= 2 then
-    table.insert(reminders, power.junk and power.junk > 0 and string.format(power.autoSell and "%d grey items sell automatically at any vendor" or "Sell %d grey items", power.junk)
-      or "Make room in your bags")
+    table.insert(reminders, power.junk and power.junk > 0
+      and (power.autoSell and L["%d grey items sell automatically at any vendor"] or L["Sell %d grey items"]):format(power.junk)
+      or L["Make room in your bags"])
   end
 
   local function yards(loc) return loc and loc.yards or 1e6 end
@@ -615,8 +641,8 @@ function QT.BestActions(buckets, power, player, groups, opts)
     local q = e.quest
     local w = batch and (near(q.loc) and 0.3 or 1.0) or 0.6
     if near(q.loc) then hereCount = hereCount + 1 end
-    step(yards(q.loc) * w + i, { icon = "turnin", text = "Hand in " .. q.title, kind = "quest", data = q.questID,
-      questID = q.questID, key = "end:" .. tostring(q.questID), loc = q.loc, xp = q.xp, sub = q.loc and q.loc.name and ("to " .. q.loc.name) or nil })
+    step(yards(q.loc) * w + i, { icon = "turnin", text = L["Hand in %s"]:format(q.title), kind = "quest", data = q.questID,
+      questID = q.questID, key = "end:" .. tostring(q.questID), loc = q.loc, xp = q.xp, sub = q.loc and q.loc.name and L["to %s"]:format(q.loc.name) or nil })
   end
   -- One at a time: no new quests while you still have one to finish.
   local wait = (not batch and #buckets.now > 0) and 5e6 or 0
@@ -625,7 +651,7 @@ function QT.BestActions(buckets, power, player, groups, opts)
       local w = batch and (near(g.giver) and 0.3 or 1.2) or 0.7
       if near(g.giver) then hereCount = hereCount + 1 end
       step(yards(g.giver) * w + wait + i, { icon = "pickup", text = pickupText(g), kind = "goto", loc = g.giver, tip = pickupTip(g),
-        giverKey = g.key, key = "pick:" .. g.key, sub = #g.quests > 1 and "Quests at your level" or nil })
+        giverKey = g.key, key = "pick:" .. g.key, sub = #g.quests > 1 and L["Quests at your level"] or nil })
     end
   end
   for i, e in ipairs(buckets.now) do
@@ -633,26 +659,26 @@ function QT.BestActions(buckets, power, player, groups, opts)
     local b = q.blockers and q.blockers[1]
     local p = QT.Progress(q)
     if b then
-      step(yards(b.loc) + i, { icon = "blocker", text = b.text .. " first",
-        sub = (b.how and (b.how .. " · ") or "") .. "needed for " .. q.title,
+      step(yards(b.loc) + i, { icon = "blocker", text = L["%s first"]:format(b.text),
+        sub = (b.how and (b.how .. " · ") or "") .. L["needed for %s"]:format(q.title),
         key = "need:" .. tostring(q.questID), pinQuestID = q.questID,
-        thenLoc = q.loc, thenTitle = "Complete " .. q.title .. " here",
+        thenLoc = q.loc, thenTitle = L["Complete %s here"]:format(q.title),
         kind = b.loc and "goto" or "quest", data = q.questID, loc = b.loc, giverKey = b.loc and b.loc.name and
-        (b.loc.name .. "|" .. (b.loc.zone or "")), tip = { "You can't finish " .. q.title .. " without this." } })
+        (b.loc.name .. "|" .. (b.loc.zone or "")), tip = { L["You can't finish %s without this."]:format(q.title) } })
     elseif q.slow then
       -- You've been here a while with little to show: a denser spot, or do something else and come back.
       local s = q.slow
-      local slowText = string.format("Slow here: only %d in %d min", s.gains, s.minutes)
+      local slowText = L["Slow here: only %d in %d min"]:format(s.gains, s.minutes)
       local alt = q.altLoc
       if alt then
-        step(yards(alt) + i, { icon = "objective", text = "Try another spot for " .. q.title, kind = "goto",
+        step(yards(alt) + i, { icon = "objective", text = L["Try another spot for %s"]:format(q.title), kind = "goto",
           questID = q.questID, key = "alt:" .. tostring(q.questID), loc = alt, qlevel = q.level, xp = q.xp,
-          sub = string.format("%s · %d spawn points there vs %d here", slowText, alt.spawns or 0, alt.hereSpawns or 0),
+          sub = slowText .. " · " .. L["%d spawn points there vs %d here"]:format(alt.spawns or 0, alt.hereSpawns or 0),
           tip = objectiveLines(q) })
       else
-        step(QT.SLOW_PENALTY + yards(q.loc) + i, { icon = "objective", text = "Go do " .. q.title, kind = "quest",
+        step(QT.SLOW_PENALTY + yards(q.loc) + i, { icon = "objective", text = L["Go do %s"]:format(q.title), kind = "quest",
           data = q.questID, questID = q.questID, key = "do:" .. tostring(q.questID), loc = q.loc, xp = q.xp,
-          qlevel = q.level, sub = slowText .. " · do something nearby and come back", tip = objectiveLines(q) })
+          qlevel = q.level, sub = slowText .. " · " .. L["do something nearby and come back"], tip = objectiveLines(q) })
       end
     elseif q.inArea then
       table.insert(inside, e) -- handled together below
@@ -664,10 +690,10 @@ function QT.BestActions(buckets, power, player, groups, opts)
       local cost = (batch and yards(q.loc) / (1 + n) or yards(q.loc)) * (1 - (batch and 0.6 or 0.7) * p)
       local sub = (not q.loc and q.zone) or nil -- objectives show as a checklist on the card
       if n > 0 then
-        sub = (sub and (sub .. " · ") or "") .. (n <= 2 and ("same trip: " .. table.concat(names, ", "))
-          or string.format("%d more quests nearby", n))
+        sub = (sub and (sub .. " · ") or "") .. (n <= 2 and L["same trip: %s"]:format(table.concat(names, ", "))
+          or L["%d more quests nearby"]:format(n))
       end
-      step(cost + i, { icon = "objective", text = "Go do " .. q.title, kind = "quest", data = q.questID,
+      step(cost + i, { icon = "objective", text = L["Go do %s"]:format(q.title), kind = "quest", data = q.questID,
         questID = q.questID, key = "do:" .. tostring(q.questID), loc = q.loc, xp = q.xp, sub = sub, tip = obj, checklist = QT.Checklist(q),
         qlevel = q.level })
     end
@@ -689,8 +715,8 @@ function QT.BestActions(buckets, power, player, groups, opts)
     table.sort(idList)
     local detail = table.concat(parts, " · ")
     step(0.01, { icon = "objective", here = true, loc = first.loc, xp = xp, qlevel = lvl, tip = tip,
-      text = #inside == 1 and ("Do " .. first.title .. " here") or string.format("Do %d quests here", #inside),
-      sub = "You're in the area" .. (detail ~= "" and (" · " .. detail) or ""),
+      text = #inside == 1 and L["Do %s here"]:format(first.title) or L["Do %d quests here"]:format(#inside),
+      sub = L["You're in the area"] .. (detail ~= "" and (" · " .. detail) or ""),
       kind = "quest", data = first.questID, questID = first.questID, questIDs = ids, checklist = #inside == 1 and QT.Checklist(first) or nil,
       key = #inside == 1 and ("do:" .. tostring(first.questID)) or ("area:" .. table.concat(idList, ",")) })
   end
@@ -699,16 +725,16 @@ function QT.BestActions(buckets, power, player, groups, opts)
   -- In batch mode, say how much is left to grab here before moving on.
   local first = route[1]
   if batch and first and near(first.loc) and hereCount > 1 then
-    first.sub = (first.sub and (first.sub .. " · ") or "") .. string.format("%d more to do here", hereCount - 1)
+    first.sub = (first.sub and (first.sub .. " · ") or "") .. L["%d more to do here"]:format(hereCount - 1)
   end
   for _, a in ipairs(route) do add(a) end
   if #acts == 0 then
     if #buckets.group > 0 then
       local q = buckets.group[1].quest
-      add({ icon = "group", text = "Find a group for " .. q.title, sub = "Ask in chat", kind = "quest", data = q.questID,
+      add({ icon = "group", text = L["Find a group for %s"]:format(q.title), sub = L["Ask in chat"], kind = "quest", data = q.questID,
         questID = q.questID })
     else
-      add({ icon = "pickup", text = "Pick up new quests", sub = "Look for a yellow ! on your map" })
+      add({ icon = "pickup", text = L["Pick up new quests"], sub = L["Look for a yellow ! on your map"] })
     end
   end
   return acts, reminders
@@ -722,23 +748,24 @@ function QT.XPSummary(buckets, player)
   end
   if total == 0 or not player.xpMax or player.xpMax == 0 then return nil end
   local need = player.xpMax - (player.xp or 0)
-  if total >= need then return "Your quests are enough to level up." end
-  return string.format("Your quests cover %d%% of this level.", math.floor(total / need * 100))
+  if total >= need then return L["Your quests are enough to level up."] end
+  return L["Your quests cover %d%% of this level."]:format(math.floor(total / need * 100))
 end
 
 -- Short tag after a quest name, only when it matters.
 local function questTag(bucket, q, backAt)
   if bucket == "drop" then
-    return q.isFailed and colored("ffff7a7a", "failed") or colored("ffb8b8b8", "grey")
+    return q.isFailed and colored("ffff7a7a", L["failed"]) or colored("ffb8b8b8", L["grey"])
   end
   if bucket == "later" then
-    return colored("ffffa060", (backAt and ("at level " .. backAt)) or (q.deferred and "saved") or ("at level " .. (q.level or 0)))
+    return colored("ffffa060", (backAt and L["at level %d"]:format(backAt)) or (q.deferred and L["saved"])
+      or L["at level %d"]:format(q.level or 0))
   end
   local tags = {}
   if q.timeLeft then table.insert(tags, colored("ffff7a7a", QT.TimeLeft(q.timeLeft))) end
-  if q.blockers and q.blockers[1] then table.insert(tags, colored("ffff7a7a", "needs item")) end
-  if q.slow then table.insert(tags, colored("ffffa060", "slow")) end
-  if q.upgrade then table.insert(tags, colored("ff40ff40", "gear")) end
+  if q.blockers and q.blockers[1] then table.insert(tags, colored("ffff7a7a", L["needs item"])) end
+  if q.slow then table.insert(tags, colored("ffffa060", L["slow"])) end
+  if q.upgrade then table.insert(tags, colored("ff40ff40", L["gear"])) end
   return table.concat(tags, " ")
 end
 
@@ -749,31 +776,31 @@ end
 function QT.FightCheck(t, me)
   if not t or not t.canAttack or t.dead or not t.level then return nil end
   local cls = t.classification or "normal"
-  local name = t.name or "Your target"
+  local name = t.name or L["Your target"]
   if t.level == -1 or cls == "worldboss" then
-    return colored("ffff7a7a", name .. ": far too strong. Leave it.")
+    return colored("ffff7a7a", L["%s: far too strong. Leave it."]:format(name))
   end
   local diff = t.level - me.level
   local elite = cls == "elite" or cls == "rareelite"
   local verdict, color
   if elite then
-    verdict, color = string.format("elite (level %d), needs a group", t.level), "ffff7a7a"
+    verdict, color = L["elite (level %d), needs a group"]:format(t.level), "ffff7a7a"
   elseif diff >= 3 then
-    verdict, color = string.format("level %d (+%d), very risky alone", t.level, diff), "ffff7a7a"
+    verdict, color = L["level %d (+%d), very risky alone"]:format(t.level, diff), "ffff7a7a"
   elseif diff == 2 then
-    verdict, color = string.format("level %d (+2), risky: you'll miss more and it hits harder", t.level), "ffffa060"
+    verdict, color = L["level %d (+2), risky: you'll miss more and it hits harder"]:format(t.level), "ffffa060"
   elseif diff == 1 then
-    verdict, color = string.format("level %d (+1), a bit tougher", t.level), "ffffd100"
+    verdict, color = L["level %d (+1), a bit tougher"]:format(t.level), "ffffd100"
   elseif cls == "rare" then
-    verdict, color = "rare, tougher than a normal mob", "ffffd100"
+    verdict, color = L["rare, tougher than a normal mob"], "ffffd100"
   end
   local tips = {}
-  if verdict and not elite and diff >= 1 then table.insert(tips, "pull it alone and start at full health") end
+  if verdict and not elite and diff >= 1 then table.insert(tips, L["pull it alone and start at full health"]) end
   if me.manaPct and me.manaPct < 60 and (verdict or diff >= 0) then
-    table.insert(tips, string.format("drink first (mana %d%%)", me.manaPct))
+    table.insert(tips, L["drink first (mana %d%%)"]:format(me.manaPct))
   end
   if not verdict and #tips == 0 then return nil end
-  local text = name .. ": " .. (verdict or string.format("level %d", t.level))
+  local text = name .. ": " .. (verdict or L["level %d"]:format(t.level))
   if #tips > 0 then
     local t1 = table.concat(tips, ", ")
     text = text .. ". " .. t1:sub(1, 1):upper() .. t1:sub(2) .. "."
@@ -785,7 +812,7 @@ end
 -- { style = "hero"|"alert"|"note"|"header"|"zone"|"item"|"more", icon, text, sub, right, progress, kind, data, loc, tip, pin, questID }
 -- kind: "quest" (data = questID), "goto", "equip" (data = item link), "toggle" (data = section id), nil = not clickable.
 -- Nothing is listed twice: the Next step's quest or giver is left out of the lists below.
--- opts = { expanded = { [sectionId] = bool }, style, committed, death } (see BestActions). groups = QT.PickupGroups (optional).
+-- opts = { expanded = { [sectionId] = bool }, style, committed, death, compact } (see BestActions). groups = QT.PickupGroups (optional).
 function QT.BuildRows(buckets, player, power, opts, groups)
   opts = opts or {}
   local expanded = opts.expanded or {}
@@ -801,18 +828,18 @@ function QT.BuildRows(buckets, player, power, opts, groups)
     local over = a.qlevel and (a.qlevel - player.level) or 0
     if over >= QT.MAX_LEVELS_ABOVE then
       local prep = {}
-      if power.train then table.insert(prep, "train") end
-      if power.durability and power.durability < 50 then table.insert(prep, "repair") end
-      table.insert(meta, string.format("Hard (+%d): %sstart at full health", over,
-        #prep > 0 and (table.concat(prep, " and ") .. " first, ") or ""))
+      if power.train then table.insert(prep, L["train"]) end
+      if power.durability and power.durability < 50 then table.insert(prep, L["repair"]) end
+      table.insert(meta, #prep > 0 and L["Hard (+%d): %s first, start at full health"]:format(over, table.concat(prep, L[" and "]))
+        or L["Hard (+%d): start at full health"]:format(over))
     end
     if a.sub then table.insert(meta, a.sub) end
     -- Inside a quest area the location is the nearest spawn of what you need, so point at it.
-    local where = a.here and a.loc and a.loc.yards and (a.loc.yards <= 25 and "one right next to you" or ("nearest " .. QT.Short(a.loc))) or (not a.here and QT.Where(a.loc, player)) or nil
+    local where = a.here and a.loc and a.loc.yards and (a.loc.yards <= 25 and L["one right next to you"] or L["nearest %s"]:format(QT.Short(a.loc))) or (not a.here and QT.Where(a.loc, player)) or nil
     if where then table.insert(meta, where) end
     local need = player.xpMax and player.xpMax > 0 and (player.xpMax - (player.xp or 0))
     if a.xp and a.xp > 0 and need and need > 0 then
-      table.insert(meta, string.format("+%d%% of level", math.max(1, math.floor(a.xp / need * 100 + 0.5))))
+      table.insert(meta, L["+%d%% of level"]:format(math.max(1, math.floor(a.xp / need * 100 + 0.5))))
     end
     add({ style = "hero", icon = a.icon, text = a.text, sub = #meta > 0 and table.concat(meta, "  ·  ") or nil,
       kind = a.kind, data = a.data, loc = a.loc, tip = a.tip, questID = a.questID, key = a.key, pinQuestID = a.pinQuestID, thenLoc = a.thenLoc, thenTitle = a.thenTitle, checklist = a.checklist,
@@ -823,13 +850,14 @@ function QT.BuildRows(buckets, player, power, opts, groups)
   local dur, rep = power.durability, power.repairAt
   if dur and dur > 0 and dur < 25 and rep then
     add({ style = "item", icon = "repair", kind = "goto", loc = rep, right = QT.Short(rep),
-      text = string.format("Repair soon (gear at %d%%): %s", dur, rep.name or "nearest vendor"),
-      tip = { "Nearest repair vendor: " .. (rep.name or "?") .. (rep.zone and (", " .. rep.zone) or "") } })
+      text = L["Repair soon (gear at %d%%): %s"]:format(dur, rep.name or L["nearest vendor"]),
+      tip = { L["Nearest repair vendor: %s"]:format((rep.name or "?") .. (rep.zone and (", " .. rep.zone) or "")) } })
   end
   if opts.hearth then add(opts.hearth) end
-  if #reminders > 0 then add({ style = "note", text = "Also: " .. table.concat(reminders, " · ") }) end
+  if #reminders > 0 then add({ style = "note", text = L["Also: %s"]:format(table.concat(reminders, " · ")) }) end
   local xp = QT.XPSummary(buckets, player)
   if xp then add({ style = "note", text = xp }) end
+  if opts.compact then return rows end -- compact panel: the Next step and its notes, no lists
 
   local function section(id, label, color, items, limit)
     if #items == 0 then return end
@@ -855,7 +883,7 @@ function QT.BuildRows(buckets, player, power, opts, groups)
       local quests = 0
       for _, it in ipairs(items) do if it.style ~= "zone" then quests = quests + 1 end end
       if quests > shown then
-        add({ style = "more", text = string.format("+%d more", quests - shown), kind = "toggle", data = id })
+        add({ style = "more", text = L["+%d more"]:format(quests - shown), kind = "toggle", data = id })
       end
     end
   end
@@ -866,30 +894,30 @@ function QT.BuildRows(buckets, player, power, opts, groups)
     local tip = QT.Checklist(q) or {}
     -- A blocked quest's reason is "First: …", which the blocker line below already says (with where and how).
     if e.reason ~= "" and not (b.id == "now" and q.blockers and q.blockers[1]) then table.insert(tip, e.reason) end
-    if q.xp and q.xp > 0 then table.insert(tip, commas(q.xp) .. " XP") end
+    if q.xp and q.xp > 0 then table.insert(tip, L["%s XP"]:format(commas(q.xp))) end
     local loc = (b.id ~= "later" and b.id ~= "drop") and q.loc or nil
     local function place(l)
       -- Blizzard's quest marker has no NPC name: just the zone then.
       local who = l.name and l.zone and (l.name .. ", " .. l.zone) or l.name or l.zone or ""
       return who .. (l.x and string.format(" %.1f, %.1f", l.x, l.y) or "")
-        .. (l.yards and string.format(" (%s yd)", commas(l.yards)) or "")
+        .. (l.yards and (" (" .. L["%s yd"]:format(commas(l.yards)) .. ")") or "")
     end
-    if loc then table.insert(tip, 1, (b.id == "turnin" and "Hand in to " or "Go to ") .. place(loc)) end
+    if loc then table.insert(tip, 1, (b.id == "turnin" and L["Hand in to %s"] or L["Go to %s"]):format(place(loc))) end
     -- Blocked: the row points where to get what's missing, not at the quest area you can't finish yet.
     local blocker = b.id == "now" and q.blockers and q.blockers[1]
     local thenLoc, thenTitle -- blocked: the second stop, where the quest is completed once you have the item
     if blocker then
-      table.insert(tip, 1, "First: " .. blocker.text .. (blocker.how and (". " .. blocker.how) or "")
-        .. (blocker.loc and (" at " .. place(blocker.loc)) or ""))
+      table.insert(tip, 1, L["First: %s."]:format(blocker.text) .. (blocker.how and (" " .. blocker.how .. ".") or "")
+        .. (blocker.loc and (" " .. L["At: %s"]:format(place(blocker.loc))) or ""))
       local questLoc = loc
       if blocker.loc then loc = blocker.loc end
-      thenLoc, thenTitle = blocker.loc and questLoc, "Complete " .. (q.title or "the quest") .. " here"
+      thenLoc, thenTitle = blocker.loc and questLoc, L["Complete %s here"]:format(q.title or L["the quest"])
     end
     local lvl = string.format("[%d]", q.level or 0)
     local p = QT.Progress(q)
     return { style = "item", icon = (q.blockers and q.blockers[1]) and "blocker" or nil,
       text = (q.color and colored(q.color, lvl) or lvl) .. " " .. (q.title or "?") .. (tag ~= "" and ("  " .. tag) or ""),
-      right = (q.inArea and not blocker and loc) and "here" or QT.Short(loc), progress = (b.id == "now" or b.id == "group") and p > 0 and p or nil,
+      right = (q.inArea and not blocker and loc) and L["here"] or QT.Short(loc), progress = (b.id == "now" or b.id == "group") and p > 0 and p or nil,
       kind = "quest", data = q.questID, questID = q.questID, loc = loc, tip = tip, drop = b.id == "drop",
       pin = b.id == "turnin" and "turnin" or blocker and "blocker" or "objective", thenLoc = thenLoc, thenTitle = thenTitle,
       retry = b.id == "later" and q.deaths and q.deaths.count >= QT.DEATHS_BEFORE_LATER or nil,
@@ -918,13 +946,13 @@ function QT.BuildRows(buckets, player, power, opts, groups)
       end)
       local byZone, order = {}, {}
       for _, e in ipairs(list) do
-        local z = (e.quest.loc and e.quest.loc.zone) or e.quest.zone or "Other"
+        local z = (e.quest.loc and e.quest.loc.zone) or e.quest.zone or L["Other"]
         if not byZone[z] then byZone[z] = {}; table.insert(order, z) end
         table.insert(byZone[z], e)
       end
       for _, z in ipairs(order) do
         if #order > 1 then -- zone headings only help when there is more than one
-          table.insert(items, { style = "zone", text = z .. ((player.zone == z) and "  (you are here)" or "") })
+          table.insert(items, { style = "zone", text = z .. ((player.zone == z) and ("  " .. L["(you are here)"]) or "") })
         end
         for _, e in ipairs(byZone[z]) do table.insert(items, questRow(b, e)) end
       end
@@ -941,21 +969,23 @@ function QT.BuildRows(buckets, player, power, opts, groups)
           local single = #g.quests == 1 and g.quests[1]
           table.insert(pick, { style = "item", icon = "pickup", kind = "goto", loc = g.giver, tip = pickupTip(g),
             text = (single and string.format("[%d] %s", single.level or 0, single.title or "?")
-              or string.format("%s  %s", g.giver.name or "?", colored("ffc8c8c8", #g.quests .. " quests")))
+              or string.format("%s  %s", g.giver.name or "?", colored("ffc8c8c8", L["%d quests"]:format(#g.quests))))
               .. (g.event and ("  " .. colored("ffc8c8c8", g.quests[1].event)) or ""),
             right = QT.Short(g.giver), questID = single and single.questID or nil })
         end
       end
-      section("pickup", "Pick up", "ffffffff", pick, 3)
+      section("pickup", L["Pick up"], "ffffffff", pick, 3)
     end
   end
   if total == 0 then
-    add({ style = "note", text = "Your quest log is empty. Pick up quests at your level (yellow ! on the map)." })
+    add({ style = "note", text = L["Your quest log is empty. Pick up quests at your level (yellow ! on the map)."] })
   end
   return rows
 end
 
--- Feedback: did following the advice work? history = { [questID] = { bucket, accepted, finished, result = "done"|"dropped" } }
+-- Feedback: did following the advice work? history = { [questID] = { bucket, last, accepted, finished, result = "done"|"dropped" } }
+-- bucket = the first advice given, last = the advice just before it was finished (turn-in aside). Judged on last:
+-- a quest saved for later and done once your level caught up followed the advice.
 function QT.Stats(history)
   local s = { done = 0, dropped = 0, minutes = 0, timed = 0, followed = 0, judged = 0 }
   for _, h in pairs(history) do
@@ -968,11 +998,12 @@ function QT.Stats(history)
     elseif h.result == "dropped" then
       s.dropped = s.dropped + 1
     end
-    if h.result and h.bucket then
+    local advice = h.last or h.bucket
+    if h.result and advice then
       s.judged = s.judged + 1
       -- Advice matched if you finished something we didn't call drop/later, or dropped what we called drop.
-      local good = (h.result == "done" and h.bucket ~= "drop" and h.bucket ~= "later")
-        or (h.result == "dropped" and h.bucket == "drop")
+      local good = (h.result == "done" and advice ~= "drop" and advice ~= "later")
+        or (h.result == "dropped" and advice == "drop")
       if good then s.followed = s.followed + 1 end
     end
   end
@@ -981,12 +1012,12 @@ function QT.Stats(history)
 end
 
 function QT.FormatStats(s)
-  local lines = { string.format("Finished %d quests, dropped %d.", s.done, s.dropped) }
+  local lines = { L["Finished %d quests, dropped %d."]:format(s.done, s.dropped) }
   if s.avgMinutes then
-    table.insert(lines, string.format("Average time from pick-up to hand-in: %d min.", math.floor(s.avgMinutes + 0.5)))
+    table.insert(lines, L["Average time from pick-up to hand-in: %d min."]:format(math.floor(s.avgMinutes + 0.5)))
   end
   if s.judged > 0 then
-    table.insert(lines, string.format("Matched Quest Triage's advice: %d of %d (%d%%).",
+    table.insert(lines, L["Matched Quest Triage's advice: %d of %d (%d%%)."]:format(
       s.followed, s.judged, math.floor(s.followed / s.judged * 100)))
   end
   return lines

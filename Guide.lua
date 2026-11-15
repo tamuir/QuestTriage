@@ -4,6 +4,7 @@
 -- shortcut: depends on Questie internals (AvailableQuests, DistanceUtils, ZoneDB, QuestieDB);
 -- everything is pcall-guarded, so a Questie update that changes them turns the guide off, not the addon.
 local _, QT = ...
+local L = QT.L
 
 local M -- Questie modules, once ready
 -- Our own bundled copy of HereBeDragons (Libs/), not Questie's: Questie treats every pin in its copy as its own.
@@ -11,9 +12,12 @@ local HBD = LibStub("HereBeDragons-2.0")
 local PINS = LibStub("HereBeDragons-Pins-2.0")
 local locCache = {}  -- [key] = loc without yards/dir; cleared on zone change and quest log change
 
+local state = "missing" -- why Questie isn't usable: "missing", "loading" or "incompatible"
 local function load()
   if M then return true end
-  if not (Questie and Questie.API and Questie.API.isReady and QuestieLoader) then return false end
+  if not (Questie and QuestieLoader) then state = "missing"; return false end
+  if not Questie.API then state = "incompatible"; return false end
+  if not Questie.API.isReady then state = "loading"; return false end
   local ok = pcall(function()
     M = {
       DB = QuestieLoader:ImportModule("QuestieDB"),
@@ -24,7 +28,7 @@ local function load()
     assert(M.DB.GetQuest and M.DU.GetNearestSpawnForQuest and M.DU.GetNearestFinisherOrStarter
       and M.Zone.GetUiMapIdByAreaId and M.AQ.__availableQuests and HBD.GetWorldVector)
   end)
-  if not ok then M = nil end
+  if not ok then M, state = nil, "incompatible" end
   -- Optional: which quests belong to an event (Darkmoon Faire). Without it, pickups just have no event label.
   if M then
     local okE, ev = pcall(QuestieLoader.ImportModule, QuestieLoader, "QuestieEvent")
@@ -34,6 +38,8 @@ local function load()
 end
 
 function QT.GuideReady() return load() end
+-- "ready", "loading" (Questie still starting), "missing" (not installed or not enabled) or "incompatible".
+function QT.GuideState() return load() and "ready" or state end
 -- questsOnly: drop only quest-log locations (objectives move as you progress); givers stay cached.
 function QT.ClearLocations(questsOnly)
   for k in pairs(locCache) do
@@ -160,11 +166,32 @@ end
 -- Blizzard's own marker for a quest: the spot it draws its blue quest area around, on your map or the quest's
 -- zone map. The game gives one point per quest per map; the area outlines themselves aren't readable.
 -- Read fresh each time: the game moves it as objectives complete, and it can be empty until map data loads.
-local function blizzardMarker(questID)
-  local quest = M.DB.GetQuest(questID)
+-- A zone's map by its name (the quest log's zone heading), among every zone of your world. Works without Questie,
+-- and in any language: the heading and the map names both come from the game.
+local zoneByName
+local function mapForZone(name)
+  if not name then return nil end
+  if not zoneByName then
+    local top = C_Map.GetBestMapForUnit("player")
+    local info = top and C_Map.GetMapInfo(top)
+    while info and info.parentMapID and info.parentMapID > 0 do
+      top = info.parentMapID
+      info = C_Map.GetMapInfo(top)
+    end
+    local list = top and C_Map.GetMapChildrenInfo(top, Enum.UIMapType.Zone, true) or {}
+    if #list < 10 then return nil end -- inside an instance, or map data not loaded yet: try again later
+    zoneByName = {}
+    for _, z in ipairs(list) do zoneByName[z.name] = zoneByName[z.name] or z.mapID end
+  end
+  return zoneByName[name]
+end
+
+-- header = the quest log's zone heading for the quest (optional).
+local function blizzardMarker(questID, header)
+  local quest = M and M.DB.GetQuest(questID)
   -- Class and profession quests have a negative zoneOrSort (a category, not a zone): no zone map then.
   local zone = quest and quest.zoneOrSort
-  local zoneMap = zone and zone > 0 and M.Zone:GetUiMapIdByAreaId(zone) or nil
+  local zoneMap = zone and zone > 0 and M.Zone:GetUiMapIdByAreaId(zone) or mapForZone(header)
   local here = C_Map.GetBestMapForUnit("player")
   -- Never false in this list: ipairs doesn't stop at false, and GetQuestsOnMap(false) throws.
   for _, mapID in ipairs({ here or zoneMap, here and zoneMap or nil }) do
@@ -173,15 +200,15 @@ local function blizzardMarker(questID)
         local info = C_Map.GetMapInfo(mapID)
         local wx, wy, inst = HBD:GetWorldCoordinatesFromZone(p.x, p.y, mapID)
         return withVector({ zone = info and info.name, uiMapId = mapID, x = p.x * 100, y = p.y * 100,
-          wx = wx, wy = wy, inst = inst, source = "Blizzard quest marker" })
+          wx = wx, wy = wy, inst = inst, source = L["Blizzard quest marker"] })
       end
     end
   end
 end
 
-function QT.BlizzardMarker(questID)
-  if not load() then return nil end
-  local ok, marker = pcall(blizzardMarker, questID)
+function QT.BlizzardMarker(questID, header)
+  load()
+  local ok, marker = pcall(blizzardMarker, questID, header)
   return ok and marker or nil
 end
 
@@ -190,11 +217,13 @@ end
 --   inside its area     -> the nearest spawn, which is inside the area you're standing in (never somewhere else)
 --   otherwise           -> Blizzard's quest marker; only without one: the nearest real hunting area, else
 --                          Questie's nearest objective point (objects, items, quests without spawn lists)
-function QT.QuestLocation(questID, isComplete, inArea)
-  if not load() then return nil end
-  if not isComplete and not inArea then
-    local marker = QT.BlizzardMarker(questID)
-    if marker then return marker end
+--   without Questie     -> Blizzard's quest marker in every case (it marks hand-ins too), or nothing
+-- header = the quest log's zone heading for the quest (optional), to find its zone map without Questie.
+function QT.QuestLocation(questID, isComplete, inArea, header)
+  local guide = load()
+  if not guide or (not isComplete and not inArea) then
+    local marker = QT.BlizzardMarker(questID, header)
+    if marker or not guide then return marker end
   end
   local key = (isComplete and "end:" or inArea and "here:" or "obj:") .. questID
   return cached(key, function()
@@ -202,14 +231,14 @@ function QT.QuestLocation(questID, isComplete, inArea)
     if not quest then return nil end
     if isComplete then
       local spawn, areaId, name = M.DU.GetNearestFinisherOrStarter(quest.Finisher)
-      return spawn, areaId, name, "turn-in NPC"
+      return spawn, areaId, name, L["turn-in NPC"]
     end
     if not inArea then
       local area = huntingArea(questID)
-      if area then return area, string.format("hunting area (%d spawn points)", area.density or 0) end
+      if area then return area, L["hunting area (%d spawn points)"]:format(area.density or 0) end
     end
     local spawn, areaId, name = M.DU.GetNearestSpawnForQuest(quest)
-    return spawn, areaId, name, inArea and "nearest spawn, inside the quest area" or "nearest spawn (Questie)"
+    return spawn, areaId, name, inArea and L["nearest spawn, inside the quest area"] or L["nearest spawn (Questie)"]
   end)
 end
 
@@ -222,7 +251,7 @@ local function findSpot(questID)
   local best, here = QT.PickBetterSpot(spawnAreas(questID))
   if not best then return nil end
   local loc = best.loc
-  loc.spawns, loc.hereSpawns, loc.source = best.density, here, "denser spot"
+  loc.spawns, loc.hereSpawns, loc.source = best.density, here, L["denser spot"]
   return loc
 end
 
@@ -247,14 +276,14 @@ local function nearestItemSource(itemID)
     if spawn and (not bestDist or dist < bestDist) then best, bestDist = { spawn, zone, name, how }, dist end
   end
   for _, id in ipairs(M.DB.QueryItemSingle(itemID, "objectDrops") or {}) do
-    local o = M.DB:GetObject(id); if o then try(o.spawns, o.name, "Loot it from " .. (o.name or "an object")) end
+    local o = M.DB:GetObject(id); if o then try(o.spawns, o.name, L["Loot it from %s"]:format(o.name or L["an object"])) end
   end
   for i, id in ipairs(M.DB.QueryItemSingle(itemID, "npcDrops") or {}) do
     if i > 15 then break end -- shortcut: checks the first 15 droppers only; enough to find a nearby one.
-    local n = M.DB:GetNPC(id); if n then try(n.spawns, n.name, "Drops from " .. (n.name or "a mob")) end
+    local n = M.DB:GetNPC(id); if n then try(n.spawns, n.name, L["Drops from %s"]:format(n.name or L["a mob"])) end
   end
   for _, id in ipairs(M.DB.QueryItemSingle(itemID, "vendors") or {}) do
-    local n = M.DB:GetNPC(id); if n then try(n.spawns, n.name, "Sold by " .. (n.name or "a vendor")) end
+    local n = M.DB:GetNPC(id); if n then try(n.spawns, n.name, L["Sold by %s"]:format(n.name or L["a vendor"])) end
   end
   if best then return best[1], best[2], best[3], best[4] end
 end
@@ -264,12 +293,19 @@ local function helperStart(child)
   local s = child.Starts or {}
   if s.NPC and #s.NPC > 0 then
     local spawn, zone, name = M.DU.GetNearestFinisherOrStarter({ NPC = s.NPC })
-    if spawn then return spawn, zone, name, "Talk to " .. (name or "the quest giver") end
+    if spawn then return spawn, zone, name, L["Talk to %s"]:format(name or L["the quest giver"]) end
   end
   if s.GameObject and #s.GameObject > 0 then
     local spawn, zone, name = M.DU.GetNearestFinisherOrStarter({ GameObject = s.GameObject })
-    if spawn then return spawn, zone, name, "Click the " .. (name or "object") end
+    if spawn then return spawn, zone, name, L["Click the %s"]:format(name or L["object"]) end
   end
+end
+
+-- A loc that also says what to do there (loc.how), kept apart from loc.source, which says where the spot came from.
+local function withHow(spawn, areaId, name, how)
+  local loc = toLoc(spawn, areaId, name)
+  if loc then loc.how = how end
+  return loc
 end
 
 -- Helper quests whose parent quest already has its item ([questID] = true). Questie keeps offering them for as
@@ -302,16 +338,16 @@ function QT.QuestBlockers(questID)
     if not C_QuestLog.IsQuestFlaggedCompleted(c) and not C_QuestLog.GetLogIndexForQuestID(c) then
       local okq, child = pcall(M.DB.GetQuest, c)
       if okq and child then
-        local loc = cached("help:" .. c, function() return helperStart(child) end, "helper quest giver")
-        table.insert(out, { text = "Pick up " .. child.name, how = loc and loc.source, loc = loc })
+        local loc = cached("help:" .. c, function() return withHow(helperStart(child)) end, L["helper quest giver"])
+        table.insert(out, { text = L["Pick up %s"]:format(child.name), how = loc and loc.how, loc = loc })
       end
     end
   end
   if #out == 0 then
     for _, item in ipairs(missing) do
-      local name = C_Item.GetItemNameByID(item) or M.DB.QueryItemSingle(item, "name") or "the quest item"
-      local loc = cached("item:" .. item, function() return nearestItemSource(item) end, "item source")
-      table.insert(out, { text = "Get " .. name, how = loc and loc.source or "Questie doesn't know where it comes from",
+      local name = C_Item.GetItemNameByID(item) or M.DB.QueryItemSingle(item, "name") or L["the quest item"]
+      local loc = cached("item:" .. item, function() return withHow(nearestItemSource(item)) end, L["item source"])
+      table.insert(out, { text = L["Get %s"]:format(name), how = loc and loc.how or L["Questie doesn't know where it comes from"],
         loc = loc })
     end
   end
@@ -349,7 +385,7 @@ function QT.ReadPickups()
     local event = ok and quest and eventOf(questID)
     if ok and quest and not quest.isHidden and not helperNotNeeded[questID] and not QuestTriageCharDB.notOffered[questID]
         and not (event and not carriesItems(questID)) then
-      local giver = cached("start:" .. questID, function() return M.DU.GetNearestFinisherOrStarter(quest.Starts) end, "quest giver")
+      local giver = cached("start:" .. questID, function() return M.DU.GetNearestFinisherOrStarter(quest.Starts) end, L["quest giver"])
       table.insert(list, {
         questID = questID, title = quest.name, level = quest.level, requiredLevel = quest.requiredLevel, event = event or nil,
         isGroup = M.DB.IsGroupQuest and M.DB.IsGroupQuest(questID) or M.DB.IsDungeonQuest(questID) or false,
@@ -386,7 +422,7 @@ function QT.CorpseLocation()
   if not pos then return nil end
   local x, y = pos:GetXY()
   local info = C_Map.GetMapInfo(mapID)
-  local loc = { name = "Your corpse", zone = info and info.name, uiMapId = mapID, x = x * 100, y = y * 100, source = "corpse" }
+  local loc = { name = L["Your corpse"], zone = info and info.name, uiMapId = mapID, x = x * 100, y = y * 100, source = L["corpse"] }
   loc.wx, loc.wy, loc.inst = HBD:GetWorldCoordinatesFromZone(x, y, mapID)
   return withVector(loc)
 end
@@ -403,7 +439,7 @@ function QT.NearestTownsfolk(kind)
         for areaId, spawns in pairs(n and n.friendly and n.spawns or {}) do
           for _, s in ipairs(spawns) do
             local loc = toLoc(s, areaId, n.name)
-            if loc and loc.wx then loc.source = kind; table.insert(list, loc) end
+            if loc and loc.wx then loc.source = L[kind]; table.insert(list, loc) end
           end
         end
       end
@@ -420,8 +456,8 @@ function QT.NearestTownsfolk(kind)
   return withVector(best)
 end
 
-local LABELS = { pickup = "Pick up", turnin = "Hand in", objective = "Objective", blocker = "Do this first",
-  group = "Group quest" }
+local LABELS = { pickup = L["Pick up"], turnin = L["Hand in"], objective = L["Objective"], blocker = L["Do this first"],
+  group = L["Group quest"] }
 
 -- Map pins. Blizzard's own map pin (with the game's on-screen navigation marker) marks the spot, and its
 -- tooltip gets a Quest Triage block added below Blizzard's lines. Our gold ring and pulse sit around it as
@@ -442,14 +478,14 @@ end
 -- Everything you need at the spot: what to do, what's left, who or what is there, exactly where, how far.
 local function addPinInfo(tip)
   local i = pinInfo
-  tip:AddDoubleLine("Quest Triage", LABELS[i.icon] or "Waypoint", 1, 0.82, 0, 0.75, 0.75, 0.75)
+  tip:AddDoubleLine("Quest Triage", LABELS[i.icon] or L["Waypoint"], 1, 0.82, 0, 0.75, 0.75, 0.75)
   tip:AddLine(i.title, 1, 1, 1, true)
   for _, line in ipairs(i.lines or {}) do tip:AddLine(line, 0.85, 0.85, 0.85, true) end
   local loc = withVector(i.loc)
-  if loc.name then tip:AddLine("At: " .. loc.name, 1, 1, 1, true) end
+  if loc.name then tip:AddLine(L["At: %s"]:format(loc.name), 1, 1, 1, true) end
   tip:AddDoubleLine(string.format("%s  %.1f, %.1f", loc.zone or "", loc.x, loc.y),
-    loc.yards and (QT.Where(loc) .. string.format(" (%s yd)", QT.Commas(loc.yards))) or "", 1, 0.82, 0, 0.75, 0.75, 0.75)
-  if loc.source then tip:AddLine("Based on: " .. loc.source, 0.78, 0.78, 0.78, true) end
+    loc.yards and (QT.Where(loc) .. " (" .. L["%s yd"]:format(QT.Commas(loc.yards)) .. ")") or "", 1, 0.82, 0, 0.75, 0.75, 0.75)
+  if loc.source then tip:AddLine(L["Based on: %s"]:format(loc.source), 0.78, 0.78, 0.78, true) end
 end
 
 -- The second stop's tooltip: what you'll do there once the first stop is done.
@@ -457,14 +493,14 @@ local function thenTooltip(self)
   local a = pinInfo and pinInfo.after
   if not a then return end
   GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
-  GameTooltip:AddDoubleLine("Quest Triage", "Then", 1, 0.82, 0, 0.75, 0.75, 0.75)
+  GameTooltip:AddDoubleLine("Quest Triage", L["Then"], 1, 0.82, 0, 0.75, 0.75, 0.75)
   GameTooltip:AddLine(a.title, 1, 1, 1, true)
-  GameTooltip:AddLine("After: " .. (pinInfo.title or "the first stop"), 0.85, 0.85, 0.85, true)
+  GameTooltip:AddLine(L["After: %s"]:format(pinInfo.title or L["the first stop"]), 0.85, 0.85, 0.85, true)
   local loc = withVector(a.loc)
-  if loc.name then GameTooltip:AddLine("At: " .. loc.name, 1, 1, 1, true) end
+  if loc.name then GameTooltip:AddLine(L["At: %s"]:format(loc.name), 1, 1, 1, true) end
   GameTooltip:AddDoubleLine(string.format("%s  %.1f, %.1f", loc.zone or "", loc.x, loc.y),
-    loc.yards and (QT.Where(loc) .. string.format(" (%s yd)", QT.Commas(loc.yards))) or "", 1, 0.82, 0, 0.75, 0.75, 0.75)
-  GameTooltip:AddLine("Right-click: remove pins.", 0.4, 1, 0.4, true)
+    loc.yards and (QT.Where(loc) .. " (" .. L["%s yd"]:format(QT.Commas(loc.yards)) .. ")") or "", 1, 0.82, 0, 0.75, 0.75, 0.75)
+  GameTooltip:AddLine(L["Right-click: remove pins."], 0.4, 1, 0.4, true)
   GameTooltip:Show()
 end
 
@@ -472,11 +508,11 @@ local function pinTooltip(self)
   if not pinInfo then return end
   GameTooltip:SetOwner(self, "ANCHOR_RIGHT")
   addPinInfo(GameTooltip)
-  if pinInfo.after then GameTooltip:AddLine("Then: " .. pinInfo.after.title, 0.4, 0.8, 1, true) end
+  if pinInfo.after then GameTooltip:AddLine(L["Then: %s"]:format(pinInfo.after.title), 0.4, 0.8, 1, true) end
   if pinInfo.questID and C_QuestLog.GetLogIndexForQuestID(pinInfo.questID) then
-    GameTooltip:AddLine("Click: open the quest.  Right-click: remove pin.", 0.4, 1, 0.4, true)
+    GameTooltip:AddLine(L["Click: open the quest.  Right-click: remove pin."], 0.4, 1, 0.4, true)
   else
-    GameTooltip:AddLine("Right-click: remove pin.", 0.4, 1, 0.4, true)
+    GameTooltip:AddLine(L["Right-click: remove pin."], 0.4, 1, 0.4, true)
   end
   GameTooltip:Show()
 end
@@ -489,7 +525,7 @@ local function addToNativeTooltip()
   lastAdd = GetTime()
   GameTooltip:AddLine(" ")
   addPinInfo(GameTooltip)
-  if pinInfo.after then GameTooltip:AddLine("Then: " .. pinInfo.after.title, 0.4, 0.8, 1, true) end
+  if pinInfo.after then GameTooltip:AddLine(L["Then: %s"]:format(pinInfo.after.title), 0.4, 0.8, 1, true) end
   GameTooltip:Show()
 end
 
@@ -545,7 +581,7 @@ local function makePin(size, second)
   f.bg:SetSize(size * 0.78, size * 0.78)
   f.bg:SetColorTexture(0.05, 0.05, 0.08, 0.95)
   local mask = f:CreateMaskTexture()
-  mask:SetTexture("Interface\CharacterFrame\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+  mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
   mask:SetAllPoints(f.bg)
   f.bg:AddMaskTexture(mask)
   f.icon = f:CreateTexture(nil, "ARTWORK")
@@ -578,7 +614,7 @@ function QT.SetWaypoint(loc, info)
   QT.ClearWaypoint()
   local after = info and info.after
   if after and not (after.loc and after.loc.uiMapId and after.loc.x) then after = nil end
-  pinInfo = { loc = loc, icon = info and info.icon, title = info and info.title or loc.name or "Waypoint",
+  pinInfo = { loc = loc, icon = info and info.icon, title = info and info.title or loc.name or L["Waypoint"],
     lines = info and info.lines, questID = info and info.questID, after = after }
   if after then
     thenMap = thenMap or makePin(26, true)

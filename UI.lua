@@ -1,5 +1,6 @@
 -- Quest Triage: the panel, events, feedback tracking, options and slash commands.
 local addonName, QT = ...
+local L = QT.L
 
 local WIDTH = 340
 local CONTENT_W = WIDTH - 44
@@ -21,22 +22,34 @@ end
 local FONTS = { metaFont, ownFont("QuestTriageFontHero", GameFontNormalMed3),
   ownFont("QuestTriageFontHeader", GameFontNormal), ownFont("QuestTriageFontItem", GameFontHighlightSmall) }
 
-local DEFAULTS = { style = "batch", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true, openMap = true, timedFirst = 0, bgAlpha = QT.PANEL_BG[4] }
+local DEFAULTS = { style = "batch", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true, openMap = true, timedFirst = 0, bgAlpha = QT.PANEL_BG[4], compact = false }
 
 local frame = CreateFrame("Frame", "QuestTriageFrame", UIParent,
   BackdropTemplateMixin and "BackdropTemplate" or nil)
 frame:SetSize(WIDTH, 300)
-frame:SetPoint("RIGHT", UIParent, "RIGHT", -260, 0)
+local function defaultPos()
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPRIGHT", UIParent, "RIGHT", -260, 150)
+end
+defaultPos()
 frame:SetFrameStrata("MEDIUM")
 frame:SetClampedToScreen(true)
 frame:SetMovable(true)
 frame:EnableMouse(true)
 frame:RegisterForDrag("LeftButton")
+-- Held by its top-left corner, so the panel grows downward and the Next card stays where you put it.
+local function anchorTop()
+  local x, y = frame:GetLeft(), frame:GetTop()
+  if not (x and y) then return end
+  frame:ClearAllPoints()
+  frame:SetPoint("TOPLEFT", UIParent, "BOTTOMLEFT", x, y)
+  frame:SetUserPlaced(false) -- our saved position, not the game's layout cache (which would keep the old anchor)
+  QuestTriageDB.pos = { "TOPLEFT", "BOTTOMLEFT", x, y }
+end
 frame:SetScript("OnDragStart", function(self) if not QuestTriageDB.opts.locked then self:StartMoving() end end)
 frame:SetScript("OnDragStop", function(self)
   self:StopMovingOrSizing()
-  local point, _, relPoint, x, y = self:GetPoint()
-  QuestTriageDB.pos = { point, relPoint, x, y }
+  anchorTop()
 end)
 if frame.SetBackdrop then
   frame:SetBackdrop({
@@ -69,7 +82,10 @@ sub:SetPoint("LEFT", title, "RIGHT", 8, 0)
 
 local close = CreateFrame("Button", nil, frame, "UIPanelCloseButton")
 close:SetPoint("TOPRIGHT", -2, -2)
-close:SetScript("OnClick", function() QT.SetShown(false) end)
+close:SetScript("OnClick", function()
+  QT.SetShown(false)
+  print("|cffffd100Quest Triage:|r " .. L["Hidden. Bring it back from the minimap's addon menu, or type /qt."])
+end)
 
 -- Options (gear) and help (?) sit next to the close button.
 local gear = CreateFrame("Button", nil, frame)
@@ -80,8 +96,8 @@ gear:SetHighlightAtlas("QuestLog-icon-setting", "ADD")
 gear:SetScript("OnClick", function() QT.OpenOptions() end)
 gear:SetScript("OnEnter", function(self)
   GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-  GameTooltip:SetText("Options", 1, 1, 1)
-  GameTooltip:AddLine("Leveling style, lock, scale, combat fade.", 0.8, 0.8, 0.8, true)
+  GameTooltip:SetText(L["Options"], 1, 1, 1)
+  GameTooltip:AddLine(L["Leveling style, timed quests, tips, size and more."], 0.8, 0.8, 0.8, true)
   GameTooltip:Show()
 end)
 gear:SetScript("OnLeave", GameTooltip_Hide)
@@ -93,27 +109,52 @@ help:SetNormalFontObject("QuestTriageFontHeader")
 help:SetHighlightFontObject("GameFontHighlight")
 help:SetText("?")
 
+-- Compact: only the Next step and its notes. "-" folds the lists away, "+" brings them back.
+local compactBtn = CreateFrame("Button", nil, frame)
+compactBtn:SetSize(16, 16)
+compactBtn:SetPoint("RIGHT", help, "LEFT", -4, 0)
+compactBtn:SetNormalFontObject("QuestTriageFontHeader")
+compactBtn:SetHighlightFontObject("GameFontHighlight")
+compactBtn:SetText("-")
+local compactSetting -- the "Compact panel" setting (registerOptions): the button goes through it so both agree
+compactBtn:SetScript("OnClick", function()
+  if compactSetting then
+    compactSetting:SetValue(not QuestTriageDB.opts.compact) -- its callback re-renders
+  else
+    QuestTriageDB.opts.compact = not QuestTriageDB.opts.compact
+    QT.Render()
+  end
+end)
+compactBtn:SetScript("OnEnter", function(self)
+  GameTooltip:SetOwner(self, "ANCHOR_LEFT")
+  GameTooltip:SetText(QuestTriageDB.opts.compact and L["Show the lists"] or L["Compact: only the Next step"], 1, 1, 1)
+  GameTooltip:Show()
+end)
+compactBtn:SetScript("OnLeave", GameTooltip_Hide)
+
 -- This session's results, shown in the help tooltip. Resets on every login or /reload.
 local session = { start = time(), done = 0, xp = 0 }
 
 help:SetScript("OnEnter", function(self)
   GameTooltip:SetOwner(self, "ANCHOR_LEFT")
   GameTooltip:SetText("Quest Triage", 1, 0.82, 0)
-  GameTooltip:AddLine("Click a line: map pin and open the map", 1, 1, 1)
-  GameTooltip:AddLine("Shift-click: link the quest in chat", 1, 1, 1)
-  GameTooltip:AddLine("Right-click: more (hide, abandon, quest log)", 1, 1, 1)
+  GameTooltip:AddLine(L["Click a line: map pin and open the map"], 1, 1, 1)
+  GameTooltip:AddLine(L["Shift-click: link the quest in chat"], 1, 1, 1)
+  GameTooltip:AddLine(L["Right-click: more (hide, abandon, quest log)"], 1, 1, 1)
   GameTooltip:AddLine(" ")
-  GameTooltip:AddDoubleLine("/qt", "show or hide", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
-  GameTooltip:AddDoubleLine("/qt options", "settings", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
-  GameTooltip:AddDoubleLine("/qt stats", "how you're doing", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
-  GameTooltip:AddDoubleLine("/qt unhide", "bring back hidden quests and items", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
-  GameTooltip:AddDoubleLine("/qt reset", "move the panel back", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
-  GameTooltip:AddDoubleLine("/qt debug", "details for a bug report", 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt", L["show or hide"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt options", L["settings"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt stats", L["how you're doing"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt unhide", L["bring back hidden quests and items"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt reset", L["move the panel back"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddDoubleLine("/qt debug", L["details for a bug report"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
+  GameTooltip:AddLine(L["The - button folds the panel to just the Next step."], 0.8, 0.8, 0.8, true)
+  GameTooltip:AddLine(L["Closed it? Bring it back from the minimap's addon menu, /qt, or a key (Options > Keybindings > AddOns)."], 0.8, 0.8, 0.8, true)
   if session.done > 0 then
     local hours = (time() - session.start) / 3600
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(string.format("This session: %d quests, %s XP%s", session.done, QT.Commas(session.xp),
-      hours > 0.08 and string.format(" (%s/hour)", QT.Commas(session.xp / hours)) or ""), 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["This session: %d quests, %s XP"]:format(session.done, QT.Commas(session.xp))
+      .. (hours > 0.08 and (" " .. L["(%s/hour)"]:format(QT.Commas(session.xp / hours))) or ""), 0.8, 0.8, 0.8)
   end
   GameTooltip:Show()
 end)
@@ -122,6 +163,8 @@ help:SetScript("OnLeave", GameTooltip_Hide)
 local scroll = CreateFrame("ScrollFrame", "QuestTriageScroll", frame, "UIPanelScrollFrameTemplate")
 scroll:SetPoint("TOPLEFT", 10, -30)
 scroll:SetPoint("BOTTOMRIGHT", -30, 10)
+scroll.scrollBarHideable = true -- Blizzard's template hides the scrollbar while nothing scrolls
+scroll.ScrollBar:Hide() -- the template's OnLoad ran before the flag was set
 
 local content = CreateFrame("Frame", nil, scroll)
 content:SetSize(CONTENT_W, 10)
@@ -129,7 +172,7 @@ scroll:SetScrollChild(content)
 
 -- Abandoning asks first.
 StaticPopupDialogs.QUESTTRIAGE_ABANDON = {
-  text = "Abandon \"%s\"?", button1 = YES, button2 = NO, timeout = 0, whileDead = true, hideOnEscape = true,
+  text = L['Abandon "%s"?'], button1 = YES, button2 = NO, timeout = 0, whileDead = true, hideOnEscape = true,
   OnAccept = function(_, questID)
     C_QuestLog.SetSelectedQuest(questID)
     C_QuestLog.SetAbandonQuest()
@@ -144,7 +187,7 @@ local function pinRow(row)
   local after = row.thenLoc and { loc = row.thenLoc, title = row.thenTitle } or nil
   if not QT.SetWaypoint(row.loc, { icon = row.pin, title = row.text:GetText(), lines = lines,
       questID = row.questID or row.pinQuestID, after = after }) then
-    print("|cffffd100Quest Triage:|r Can't place a map pin there (dungeon or other continent).")
+    print("|cffffd100Quest Triage:|r " .. L["Can't place a map pin there (dungeon or other continent)."])
   end
 end
 
@@ -159,35 +202,35 @@ local function rowMenu(row)
   local questID = row.questID
   MenuUtil.CreateContextMenu(row, function(_, root)
     root:CreateTitle(row.text:GetText())
-    if row.loc then root:CreateButton("Show on map", function() pinRow(row) end) end
+    if row.loc then root:CreateButton(L["Show on map"], function() pinRow(row) end) end
     if row.hearth then
-      root:CreateButton("Don't suggest this inn", function()
+      root:CreateButton(L["Don't suggest this inn"], function()
         QuestTriageCharDB.hearthSkip[row.hearth] = true
         QT.Render()
       end)
     end
     if row.kind == "equip" and row.data then
-      root:CreateButton("Don't suggest this item", function()
+      root:CreateButton(L["Don't suggest this item"], function()
         QuestTriageCharDB.skipItems[C_Item.GetItemInfoInstant(row.data)] = true
         QT.Render()
       end)
     end
     if questID and C_QuestLog.GetLogIndexForQuestID(questID) then
-      root:CreateButton("Open in quest log", function() QuestMapFrame_OpenToQuestDetails(questID) end)
+      root:CreateButton(L["Open in quest log"], function() QuestMapFrame_OpenToQuestDetails(questID) end)
       -- Same check and call as Blizzard's objective tracker menu.
       if IsInGroup() and C_QuestLog.IsPushableQuest(questID) then
-        root:CreateButton("Share with party", function() QuestUtil.ShareQuest(questID) end)
+        root:CreateButton(L["Share with party"], function() QuestUtil.ShareQuest(questID) end)
       end
     end
     if row.retry and questID then
-      root:CreateButton("Try it again now", function()
+      root:CreateButton(L["Try it again now"], function()
         QuestTriageCharDB.deaths[questID] = nil
         QT.Render()
       end)
     end
     -- Your call: park a quest in Save for later until a level you pick, or until you bring it back.
     if row.saved and questID then
-      root:CreateButton("Do it now", function()
+      root:CreateButton(L["Do it now"], function()
         QuestTriageCharDB.deferred[questID] = nil
         QT.Render()
       end)
@@ -199,11 +242,11 @@ local function rowMenu(row)
         if h then h.deferred = true end -- feedback: the player disagreed with the advice
         QT.Render()
       end
-      root:CreateButton(string.format("Save for later: until level %d", back), function() save(back) end)
-      root:CreateButton("Save for later: until I bring it back", function() save(nil) end)
+      root:CreateButton(L["Save for later: until level %d"]:format(back), function() save(back) end)
+      root:CreateButton(L["Save for later: until I bring it back"], function() save(nil) end)
     end
     if questID then
-      root:CreateButton("Hide from list", function()
+      root:CreateButton(L["Hide from list"], function()
         QuestTriageCharDB.hidden[questID] = true
         local h = QuestTriageCharDB.history[questID]
         if h then h.hidden = true end -- feedback: the player disagreed with the advice
@@ -211,9 +254,9 @@ local function rowMenu(row)
       end)
     end
     if row.drop and questID and C_QuestLog.CanAbandonQuest(questID) then
-      root:CreateButton("|cffff5050Abandon quest|r", function()
+      root:CreateButton("|cffff5050" .. L["Abandon quest"] .. "|r", function()
         StaticPopup_Show("QUESTTRIAGE_ABANDON", C_QuestLog.GetTitleForQuestID and C_QuestLog.GetTitleForQuestID(questID)
-          or "this quest", nil, questID)
+          or L["this quest"], nil, questID)
       end)
     end
   end)
@@ -230,7 +273,7 @@ local function onRowClick(row, button)
     QuestMapFrame_OpenToQuestDetails(row.data)
   elseif row.kind == "equip" then
     if InCombatLockdown() then
-      print("|cffffd100Quest Triage:|r You can't change gear in combat. Click again after the fight.")
+      print("|cffffd100Quest Triage:|r " .. L["You can't change gear in combat. Click again after the fight."])
     else
       C_Item.EquipItemByName(row.data)
     end
@@ -243,12 +286,12 @@ local function onRowClick(row, button)
 end
 
 local HINTS = {
-  quest = "Click: open in your quest log.",
-  questLoc = "Click: map pin and open the map.",
-  ["goto"] = "Click: map pin and open the map.",
-  equip = "Click: put it on. Right-click: don't suggest it.",
-  bags = "Click: open your bags.",
-  toggle = "Click: show or hide.",
+  quest = L["Click: open in your quest log."],
+  questLoc = L["Click: map pin and open the map."],
+  ["goto"] = L["Click: map pin and open the map."],
+  equip = L["Click: put it on. Right-click: don't suggest it."],
+  bags = L["Click: open your bags."],
+  toggle = L["Click: show or hide."],
 }
 
 -- Details live here, not in the panel: objectives, reason, exact location, XP, then what clicks do.
@@ -260,11 +303,11 @@ local function onRowEnter(row)
     GameTooltip:SetText(row.text:GetText(), 1, 1, 1, 1, true)
     if row.sub:IsShown() then GameTooltip:AddLine(row.sub:GetText(), 0.8, 0.8, 0.8, true) end
     for _, line in ipairs(row.tip or {}) do GameTooltip:AddLine(line, 0.8, 0.8, 0.8, true) end
-    if row.yards then GameTooltip:AddLine(QT.Commas(row.yards) .. " yd away", 0.78, 0.78, 0.78) end
+    if row.yards then GameTooltip:AddLine(L["%s yd away"]:format(QT.Commas(row.yards)), 0.78, 0.78, 0.78) end
   end
   local hint = HINTS[(row.kind == "quest" and row.loc) and "questLoc" or row.kind]
   if hint then GameTooltip:AddLine(hint, 0.4, 1, 0.4, true) end
-  if row.questID then GameTooltip:AddLine("Shift-click: link in chat.  Right-click: more.", 0.4, 1, 0.4, true) end
+  if row.questID then GameTooltip:AddLine(L["Shift-click: link in chat.  Right-click: more."], 0.4, 1, 0.4, true) end
   GameTooltip:Show()
 end
 
@@ -454,7 +497,7 @@ function QT.ReadTarget()
   local level = UnitLevel("target")
   if not readable(level) then return nil end
   local name = UnitName("target")
-  return { name = readable(name) and name or "Your target", level = level,
+  return { name = readable(name) and name or L["Your target"], level = level,
     classification = UnitClassification("target"), canAttack = UnitCanAttack("player", "target"),
     dead = UnitIsDead("target") }
 end
@@ -489,8 +532,8 @@ local function sellJunk()
   else
     for _, s in ipairs(slots) do C_Container.UseContainerItem(s[1], s[2]) end
   end
-  print(string.format("|cffffd100Quest Triage:|r Sold %d gray item%s for %s. (Turn this off in /qt options.)",
-    count, count > 1 and "s" or "", GetMoneyString(value, true)))
+  print("|cffffd100Quest Triage:|r " .. (count == 1 and L["Sold 1 gray item for %s. (Turn this off in /qt options.)"]:format(GetMoneyString(value, true))
+    or L["Sold %d gray items for %s. (Turn this off in /qt options.)"]:format(count, GetMoneyString(value, true))))
 end
 
 -- A death counts against the quest you were doing, if you died near where it's done.
@@ -507,8 +550,8 @@ local function recordDeath()
   d.count = d.count + 1
   QuestTriageCharDB.deaths[id] = d
   if d.count == QT.DEATHS_BEFORE_LATER then
-    local title = C_QuestLog.GetTitleForQuestID(id) or "this quest"
-    print(string.format("|cffffd100Quest Triage:|r You died %d times on %s. Moved to Save for later; come back at level %d, or bring a friend. Right-click it to try again.",
+    local title = C_QuestLog.GetTitleForQuestID(id) or L["this quest"]
+    print("|cffffd100Quest Triage:|r " .. L["You died %d times on %s. Moved to Save for later; come back at level %d, or bring a friend. Right-click it to try again."]:format(
       d.count, title, level + 2))
   end
 end
@@ -565,6 +608,7 @@ function QT.Render()
         history[id] = h
         h.title, h.level = e.quest.title, e.quest.level
         h.bucket = h.bucket or b.id
+        if b.id ~= "turnin" then h.last = b.id end
       end
     end
   end
@@ -586,7 +630,7 @@ function QT.Render()
       QT.ClearWaypoint()
       if after then
         QT.SetWaypoint(after.loc, { icon = "objective", title = after.title, questID = pin.questID, quiet = true })
-        print("|cffffd100Quest Triage:|r Got it. Pin moved to " .. (inLog.title or "the quest") .. ".")
+        print("|cffffd100Quest Triage:|r " .. L["Got it. Pin moved to %s."]:format(inLog.title or L["the quest"]))
       end
     end
   end
@@ -594,8 +638,9 @@ function QT.Render()
   if not frame:IsShown() then return end
   local power = QT.ReadPower(player.level)
   local pct = player.xpMax and player.xpMax > 0 and math.floor(player.xp / player.xpMax * 100)
-  sub:SetText(string.format("Level %d%s%s", player.level, pct and string.format(" · %d%%", pct) or "",
-    power.nextSpells and string.format(" · spells at %d", power.nextSpells) or ""))
+  compactBtn:SetText(QuestTriageDB.opts.compact and "+" or "-")
+  sub:SetText(L["Level %d"]:format(player.level) .. (pct and string.format(" · %d%%", pct) or "")
+    .. (power.nextSpells and (" · " .. L["spells at %d"]:format(power.nextSpells)) or ""))
   local pickups = QT.ReadPickups()
   -- A quest you can start from your bags is shown as "Open <item>", not as a trip to where it drops.
   if pickups and power.bagQuest then
@@ -618,15 +663,30 @@ function QT.Render()
   end
   local specs = QT.BuildRows(buckets, player, power,
     { expanded = QuestTriageDB.expanded, style = QuestTriageDB.opts.style, timedFirst = QuestTriageDB.opts.timedFirst,
-      committed = QuestTriageCharDB.committed, death = death, hearth = hearth, fight = QT.ReadTarget(), manaPct = QT.ReadManaPct() },
+      committed = QuestTriageCharDB.committed, death = death, hearth = hearth, fight = QT.ReadTarget(), manaPct = QT.ReadManaPct(),
+      compact = QuestTriageDB.opts.compact },
     pickups and QT.PickupGroups(pickups, player, hidden))
   -- Remember the Next step so it stays Next until done (survives death and /reload).
   if specs[1] and specs[1].key then QuestTriageCharDB.committed = specs[1].key end
-  if not pickups then
-    table.insert(specs, { style = "note", text = "Directions and pick-ups need Questie (installed and loaded)." })
+  -- Nothing while Questie is still starting up at login.
+  local guide = QT.GuideState()
+  if guide == "missing" then
+    table.insert(specs, { style = "note", text = L["Quests to pick up need Questie (installed and enabled)."] })
+  elseif guide == "incompatible" then
+    table.insert(specs, { style = "note", text = L["This Questie version isn't supported: no quests to pick up."] })
   end
   QT.lastSpecs = specs
   layout(specs)
+end
+
+-- How long each refresh takes, for /qt debug: decide from real numbers whether the 2-second refresh needs splitting.
+local perf = { runs = 0, last = 0, max = 0, total = 0 }
+local render = QT.Render
+function QT.Render()
+  local t = debugprofilestop()
+  render()
+  t = debugprofilestop() - t
+  perf.runs, perf.last, perf.total, perf.max = perf.runs + 1, t, perf.total + t, math.max(perf.max, t)
 end
 
 -- /qt debug: everything behind the arrows and pins, in a copy window and in SavedVariables (QuestTriageCharDB.debug)
@@ -652,7 +712,7 @@ function QT.Debug()
   if h then table.insert(lines, "Next: " .. (h.text or "?") .. " | key " .. tostring(h.key) .. " | " .. fmtLoc(h.loc)) end
   for _, q in ipairs(QT.lastQuests or {}) do
     local b = blizz[q.questID]
-    local any = QT.BlizzardMarker and QT.BlizzardMarker(q.questID)
+    local any = QT.BlizzardMarker(q.questID, q.zone)
     table.insert(lines, string.format("[%s] %s%s%s | %s | Blizzard marker: %s | your or quest's zone map: %s", tostring(q.questID),
       q.title or "?", q.isComplete and " (complete)" or "", q.inArea and " (you're in its area)" or "", fmtLoc(q.loc),
       b and string.format("%.1f, %.1f", b.x * 100, b.y * 100) or "none on this map",
@@ -683,7 +743,9 @@ function QT.Debug()
   end
   local meta = C_AddOns and C_AddOns.GetAddOnMetadata or GetAddOnMetadata
   table.insert(lines, 2, "Quest Triage " .. (meta("QuestTriage", "Version") or "?")
-    .. ", Questie " .. (meta("Questie", "Version") or "not loaded"))
+    .. ", Questie " .. (meta("Questie", "Version") or "not loaded") .. " (" .. QT.GuideState() .. ")")
+  table.insert(lines, 3, string.format("Refresh: last %.1f ms, average %.1f ms, slowest %.1f ms (%d runs)",
+    perf.last, perf.total / math.max(1, perf.runs), perf.max, perf.runs))
   QuestTriageCharDB.debug = lines -- also kept in SavedVariables (written on /reload)
   QT.ShowCopyWindow("Quest Triage debug", table.concat(lines, "\n"))
 end
@@ -704,7 +766,7 @@ function QT.ShowCopyWindow(title, text)
     tinsert(UISpecialFrames, "QuestTriageCopyWindow") -- Esc closes it
     f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.hint:SetPoint("TOPLEFT", 14, -30)
-    f.hint:SetText("Press Ctrl+C to copy, then paste it into your bug report. It holds your quest log and position, nothing else.")
+    f.hint:SetText(L["Press Ctrl+C to copy, then paste it into your bug report. It holds your quest log and position, nothing else."])
     local s = CreateFrame("ScrollFrame", nil, f, "InputScrollFrameTemplate")
     s:SetPoint("TOPLEFT", 14, -50)
     s:SetPoint("BOTTOMRIGHT", -14, 14)
@@ -733,7 +795,10 @@ function QT.SetShown(shown)
   QuestTriageDB.shown = shown
   if ticker then ticker:Cancel(); ticker = nil end
   if shown then
-    frame:Show(); QT.Render()
+    frame:Show()
+    -- A position saved by an older version is held by its centre: re-anchor it by the top once.
+    if QuestTriageDB.pos and QuestTriageDB.pos[1] ~= "TOPLEFT" then anchorTop() end
+    QT.Render()
     ticker = C_Timer.NewTicker(2, function() QT.Render() end)
   else
     frame:Hide()
@@ -748,63 +813,68 @@ local function registerOptions()
   category = Settings.RegisterVerticalLayoutCategory("Quest Triage")
 
   local style = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_STYLE", "style", opts, Settings.VarType.String,
-    "Leveling style", DEFAULTS.style)
+    L["Leveling style"], DEFAULTS.style)
   style:SetValueChangedCallback(function() QT.Render() end)
   Settings.CreateDropdown(category, style, function()
     local c = Settings.CreateControlTextContainer()
-    c:Add("batch", "Batch (fastest)", "Pick up every quest near you before leaving a town, and do quests whose objectives are close together in one trip.")
-    c:Add("single", "One at a time", "Finish one quest, hand it in, then pick up the next.")
+    c:Add("batch", L["Batch (fastest)"], L["Pick up every quest near you before leaving a town, and do quests whose objectives are close together in one trip."])
+    c:Add("single", L["One at a time"], L["Finish one quest, hand it in, then pick up the next."])
     return c:GetData()
-  end, "How Quest Triage plans your route.")
+  end, L["How Quest Triage plans your route."])
 
   local timedFirst = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_TIMED", "timedFirst", opts, Settings.VarType.Number,
-    "Timed quests first", DEFAULTS.timedFirst)
+    L["Timed quests first"], DEFAULTS.timedFirst)
   timedFirst:SetValueChangedCallback(function() QT.Render() end)
   Settings.CreateDropdown(category, timedFirst, function()
     local c = Settings.CreateControlTextContainer()
-    c:Add(0, "Always", "A timed quest (or its hand-in) is always the next step while its timer runs.")
-    c:Add(30, "Under 30 minutes left")
-    c:Add(15, "Under 15 minutes left")
-    c:Add(5, "Under 5 minutes left")
-    c:Add(-1, "Never", "Timed quests are ranked like any other quest. The time left is still shown.")
+    c:Add(0, L["Always"], L["A timed quest (or its hand-in) is always the next step while its timer runs."])
+    c:Add(30, L["Under %d minutes left"]:format(30))
+    c:Add(15, L["Under %d minutes left"]:format(15))
+    c:Add(5, L["Under %d minutes left"]:format(5))
+    c:Add(-1, L["Never"], L["Timed quests are ranked like any other quest. The time left is still shown."])
     return c:GetData()
-  end, "When a quest with a timer jumps ahead of everything else.")
+  end, L["When a quest with a timer jumps ahead of everything else."])
+
+  compactSetting = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_COMPACT", "compact", opts, Settings.VarType.Boolean,
+    L["Compact panel"], DEFAULTS.compact)
+  compactSetting:SetValueChangedCallback(function() QT.Render() end)
+  Settings.CreateCheckbox(category, compactSetting, L["Show only the Next step and its notes, without the quest lists. The - and + buttons on the panel do the same."])
 
   local lock = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_LOCKED", "locked", opts, Settings.VarType.Boolean,
-    "Lock panel position", DEFAULTS.locked)
-  Settings.CreateCheckbox(category, lock, "Stop the panel from being dragged.")
+    L["Lock panel position"], DEFAULTS.locked)
+  Settings.CreateCheckbox(category, lock, L["Stop the panel from being dragged."])
 
   local junk = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_AUTOSELL", "autoSellJunk", opts, Settings.VarType.Boolean,
-    "Sell gray items automatically", DEFAULTS.autoSellJunk)
-  Settings.CreateCheckbox(category, junk, "When you open any vendor, sell all gray (Poor) items and show what they made.")
+    L["Sell gray items automatically"], DEFAULTS.autoSellJunk)
+  Settings.CreateCheckbox(category, junk, L["When you open any vendor, sell all gray (Poor) items and show what they made."])
 
   local hearthTips = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_HEARTH", "hearthTips", opts, Settings.VarType.Boolean,
-    "Hearthstone tips", DEFAULTS.hearthTips)
+    L["Hearthstone tips"], DEFAULTS.hearthTips)
   hearthTips:SetValueChangedCallback(function() QT.Render() end)
-  Settings.CreateCheckbox(category, hearthTips, "When you're in a town far from where your hearthstone is set, suggest setting it at the inn there.")
+  Settings.CreateCheckbox(category, hearthTips, L["When you're in a town far from where your hearthstone is set, suggest setting it at the inn there."])
 
   local openMap = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_OPENMAP", "openMap", opts, Settings.VarType.Boolean,
-    "Open the map when pinning", DEFAULTS.openMap)
-  Settings.CreateCheckbox(category, openMap, "Clicking a step opens the world map at its pin. Off: the pin is set quietly (map, minimap and navigation arrow).")
+    L["Open the map when pinning"], DEFAULTS.openMap)
+  Settings.CreateCheckbox(category, openMap, L["Clicking a step opens the world map at its pin. Off: the pin is set quietly (map, minimap and navigation arrow)."])
 
   local fade = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_FADE", "fadeInCombat", opts, Settings.VarType.Boolean,
-    "Fade in combat", DEFAULTS.fadeInCombat)
-  Settings.CreateCheckbox(category, fade, "Fade the panel to 30% in combat and let clicks pass through it.")
+    L["Fade in combat"], DEFAULTS.fadeInCombat)
+  Settings.CreateCheckbox(category, fade, L["Fade the panel to 30% in combat and let clicks pass through it."])
 
   local scale = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_SCALE", "scale", opts, Settings.VarType.Number,
-    "Panel size", DEFAULTS.scale)
+    L["Panel size"], DEFAULTS.scale)
   scale:SetValueChangedCallback(function(_, value) frame:SetScale(value) end)
   local sliderOpts = Settings.CreateSliderOptions(0.7, 1.4, 0.05)
   sliderOpts:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(v) return string.format("%d%%", v * 100 + 0.5) end)
-  Settings.CreateSlider(category, scale, sliderOpts, "Make the panel bigger or smaller.")
+  Settings.CreateSlider(category, scale, sliderOpts, L["Make the panel bigger or smaller."])
 
   local bgAlpha = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_BGALPHA", "bgAlpha", opts, Settings.VarType.Number,
-    "Background opacity", DEFAULTS.bgAlpha)
+    L["Background opacity"], DEFAULTS.bgAlpha)
   bgAlpha:SetValueChangedCallback(function(_, value) QT.SetOpacity(value) end)
   local alphaOpts = Settings.CreateSliderOptions(0.2, 1, 0.05)
   alphaOpts:SetLabelFormatter(MinimalSliderWithSteppersMixin.Label.Right, function(v) return string.format("%d%%", v * 100 + 0.5) end)
   Settings.CreateSlider(category, bgAlpha, alphaOpts,
-    "How much of the game shows through the panel. Below 95% every letter gets a dark outline, so the text stays readable over anything.")
+    L["How much of the game shows through the panel. Below 95% every letter gets a dark outline, so the text stays readable over anything."])
 
   Settings.RegisterAddOnCategory(category)
 end
@@ -846,7 +916,7 @@ for _, e in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE"
   "PLAYER_EQUIPMENT_CHANGED", "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "BAG_UPDATE_DELAYED",
   "UPDATE_INVENTORY_DURABILITY", "ZONE_CHANGED_NEW_AREA", "TRAINER_SHOW", "TRAINER_UPDATE",
   "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST",
-  "PLAYER_TARGET_CHANGED", "PLAYER_INSIDE_QUEST_BLOB_STATE_CHANGED", "MERCHANT_SHOW", "HEARTHSTONE_BOUND", "GOSSIP_SHOW", "QUEST_GREETING" }) do
+  "PLAYER_TARGET_CHANGED", "PLAYER_INSIDE_QUEST_BLOB_STATE_CHANGED", "MERCHANT_SHOW", "HEARTHSTONE_BOUND", "GOSSIP_SHOW", "QUEST_GREETING", "QUEST_COMPLETE" }) do
   frame:RegisterEvent(e)
 end
 frame:SetScript("OnEvent", function(self, event, arg1, arg2)
@@ -884,6 +954,14 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     requestRender()
   elseif event == "GOSSIP_SHOW" or event == "QUEST_GREETING" then
     noteOffered(event)
+  elseif event == "QUEST_COMPLETE" then
+    -- The reward window: name the choice that's a clear upgrade. A hint only; the pick stays yours.
+    if (GetNumQuestChoices() or 0) > 1 then
+      C_Timer.After(0.3, function() -- item stats can arrive a moment after the window opens
+        local up = QT.BestRewardChoice()
+        if up then print("|cffffd100Quest Triage:|r " .. L["Best reward for you: %s (%s)."]:format(up.link, QT.UpgradeNote(up))) end
+      end)
+    end
   elseif event == "MERCHANT_SHOW" then
     sellJunk()
   elseif event == "PLAYER_DEAD" then
@@ -928,14 +1006,27 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
   end
 end)
 
+-- Ways back after closing the panel: the key binding (Bindings.xml) and the game's minimap addon menu.
+function QT.Toggle() QT.SetShown(not frame:IsShown()) end
+BINDING_HEADER_QUESTTRIAGE = "Quest Triage"
+BINDING_NAME_QUESTTRIAGE_TOGGLE = L["Show or hide the panel"]
+BINDING_NAME_QUESTTRIAGE_NEXT = L["Go to the next step (same as clicking it)"]
+function QT.DoNext()
+  if not frame:IsShown() then QT.SetShown(true) end
+  local r = rows[1]
+  if r and r:IsShown() and r.interactive then onRowClick(r, "LeftButton") end
+end
+function QuestTriage_OnAddonCompartmentClick(_, button)
+  if button == "RightButton" then QT.OpenOptions() else QT.Toggle() end
+end
+
 SLASH_QUESTTRIAGE1 = "/qt"
 SLASH_QUESTTRIAGE2 = "/questtriage"
 SlashCmdList.QUESTTRIAGE = function(msg)
   msg = string.lower(msg or "")
   if msg == "reset" then
     QuestTriageDB.pos = nil
-    frame:ClearAllPoints()
-    frame:SetPoint("RIGHT", UIParent, "RIGHT", -260, 0)
+    defaultPos()
     QT.SetShown(true)
   elseif msg == "stats" then
     for _, line in ipairs(QT.FormatStats(QT.Stats(QuestTriageCharDB.history))) do
@@ -948,9 +1039,9 @@ SlashCmdList.QUESTTRIAGE = function(msg)
   elseif msg == "unhide" then
     wipe(QuestTriageCharDB.hidden)
     wipe(QuestTriageCharDB.skipItems)
-    print("|cffffd100Quest Triage:|r Hidden quests and items are back.")
+    print("|cffffd100Quest Triage:|r " .. L["Hidden quests and items are back."])
     QT.Render()
   else
-    QT.SetShown(not frame:IsShown())
+    QT.Toggle()
   end
 end

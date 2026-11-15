@@ -2,6 +2,21 @@
 
 ## [Unreleased]
 
+- Closed the panel? Bring it back from the minimap's addon menu (right-click there opens the options), or set a key in Options > Keybindings > AddOns. Closing it now says how.
+- The panel is held by its top edge: it grows downward and the Next card no longer jumps when the list changes.
+- The scrollbar only shows when there's something to scroll.
+- "Directions need Questie" no longer flashes at every login while Questie starts up, and an unsupported Questie version now says so.
+- Map pin tooltips no longer say "Based on: Click the …".
+- `/qt stats` judges a quest by the advice just before you finished it: one saved for later and done once your level caught up counts as following the advice.
+- `/qt debug` shows how long each refresh takes.
+- Deutsch: Quest Triage is now in German on a German client. Anything not translated yet shows in English.
+- Group, dungeon and PvP quests are recognised in every language. Battleground quests (like Battle of Warsong Gulch) now sit in Needs a group instead of Do now.
+- Directions without Questie: the arrow and map pins follow Blizzard's own quest markers, hand-ins included. Questie still adds quests to pick up, turn-in NPC names, missing items and hunting spots.
+- Compact panel: the new - button folds the panel to just the Next step; + brings the lists back. Also a setting, "Compact panel".
+- Pick up lists quest givers within about 3½ minutes' walk, plus always the nearest three, instead of every giver on the continent.
+- New key binding "Go to the next step": does what clicking the Next card does.
+- At the quest reward window, Quest Triage names the choice that's a clear upgrade for you, in chat. It never picks for you.
+
 ## [0.5.8] - 2026-11-16
 
 - Hearthstone tips skip a city your mage can already teleport to: no need to spend your hearthstone on it.
