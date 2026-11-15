@@ -406,6 +406,11 @@ do
   assert(QT.HearthTip(b, inn(250, 0), "The Crossroads"), "known bind far away: suggests from anywhere in town")
   b.inst = 2
   assert(QT.HearthTip(b, inn(250, 5000), "Somewhere"), "bound on another continent")
+  local org = inn(250, 5000)
+  org.uiMapId = 1454
+  assert(not QT.HearthTip(b, org, "Orgrimmar", function(id) return id == 3567 end), "a mage who can teleport there: silent")
+  assert(QT.HearthTip(b, org, "Orgrimmar", function() return false end), "teleport not learned yet: still suggests")
+  assert(QT.HearthTip(b, inn(250, 5000), "Somewhere", function() return true end), "no teleport goes to this town")
   local rows = QT.BuildRows({ turnin = {}, now = {}, group = {}, later = {}, drop = {} }, { level = 10 }, {},
     { hearth = t })
   assert(has(rows, "^Set your hearthstone"), "shown in the panel")

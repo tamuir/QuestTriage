@@ -353,14 +353,19 @@ end
 -- bind = { name = GetBindLocation(), wx, wy, inst }: the position is learned (written into bind) the first time
 -- you stand at that inn. Until then it only speaks at an inn, where the zone name settles it (the game's own check).
 -- inn = nearest friendly innkeeper loc with yards; zoneText = GetMinimapZoneText(). Returns a row or nil.
+-- knows(spellID) = is that spell in your spellbook: a city you can teleport to needs no hearthstone.
 QT.INN_NEAR = 300    -- yards: you're in this inn's town
 QT.INN_AT = 60       -- yards: you're at the inn
 QT.HEARTH_FAR = 1000 -- yards: a bind closer than this is fine
-function QT.HearthTip(bind, inn, zoneText)
+-- Mage teleports by the city's uiMapID (both checked in the 1.60.1 client data).
+QT.TELEPORTS = { [1453] = 3561, [1455] = 3562, [1458] = 3563, [1457] = 3565, [1456] = 3566, [1454] = 3567 }
+function QT.HearthTip(bind, inn, zoneText, knows)
   if not (bind and bind.name and inn and inn.yards and inn.yards <= QT.INN_NEAR) then return nil end
   if not bind.wx and inn.yards <= QT.INN_AT and bind.name == zoneText then
     bind.wx, bind.wy, bind.inst = inn.wx, inn.wy, inn.inst
   end
+  local teleport = knows and QT.TELEPORTS[inn.uiMapId]
+  if teleport and knows(teleport) then return nil end
   if bind.wx then
     local d = between(bind, inn)
     if d and d <= QT.HEARTH_FAR then return nil end

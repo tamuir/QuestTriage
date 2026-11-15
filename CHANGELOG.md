@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- Hearthstone tips skip a city your mage can already teleport to: no need to spend your hearthstone on it.
+
 ## [0.5.7] - 2026-11-13
 
 - Timed quests (like Need for a Cure) come first: while the timer runs, the Next step is that quest or its hand-in, whatever else is nearby, and it shows the minutes left. New setting "Timed quests first": always (default), only under 30, 15 or 5 minutes left, or never.
