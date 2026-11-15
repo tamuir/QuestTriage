@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.8] - 2026-11-16
+
 - Hearthstone tips skip a city your mage can already teleport to: no need to spend your hearthstone on it.
 
 ## [0.5.7] - 2026-11-13
