@@ -67,8 +67,8 @@ Already set up: the project ID is in `QuestTriage.toc` (`## X-Curse-Project-ID`)
 GitHub secret `CF_API_KEY` (repo Settings > Secrets and variables > Actions). If the token is ever replaced, create a
 new one on CurseForge (account settings, API tokens) and update that secret.
 
-**Releasing is one step**: rename `## [Unreleased]` at the top of `CHANGELOG.md` to a dated section such as
-`## [0.5.9] - 2026-11-20`, and push to main. GitHub runs the tests, tags `v0.5.9`, builds the zip (only what the game
+**Releasing is one step**: add a dated heading such as `## [0.5.9] - 2026-11-19` under `## [Unreleased]` at the top of
+`CHANGELOG.md`, and push to main. GitHub runs the tests, tags `v0.5.9`, builds the zip (only what the game
 loads) and uploads it to GitHub Releases and CurseForge for WoW: Forever. The version in the `.toc` is stamped
 automatically.
 

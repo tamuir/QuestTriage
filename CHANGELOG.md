@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.5.9] - 2026-11-19
+
 - Closed the panel? Bring it back from the minimap's addon menu (right-click there opens the options), or set a key in Options > Keybindings > AddOns. Closing it now says how.
 - The panel is held by its top edge: it grows downward and the Next card no longer jumps when the list changes.
 - The scrollbar only shows when there's something to scroll.
