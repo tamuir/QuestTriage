@@ -26,7 +26,7 @@ Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn area
 **Turn in · Do now · Pick up · Needs a group · Save for later · Drop**, each with a one-line reason. Hover any line for the objectives, the reason and the exact location; click to pin it on your map.
 
 - **Quest items in your bags**: an item that starts a quest you don't have yet becomes the next step, "Open" it.
-- **Nearby quests you haven't picked up yet**, worth doing at your level, nearest first. Event quests (Darkmoon Faire and holidays) are listed with the event's name but never pull you off your route. Talk to a quest giver and it checks what they really offer you: a follow-up you can't take yet drops off the list until you can.
+- **Nearby quests you haven't picked up yet**, worth doing at your level, nearest first, from givers within a few minutes' walk. Don't want one, or your friends already did it? Right-click and skip it. Event quests (Darkmoon Faire and holidays) are listed with the event's name but never pull you off your route. Talk to a quest giver and it checks what they really offer you: a follow-up you can't take yet drops off the list until you can.
 - **Save for later** shows the level to come back at; **Drop** flags grey and failed quests.
 - **Knows the game's quest areas**: it points where Blizzard itself marks the quest on your map, and inside the white boundary on your minimap it says "do it here".
 - **Catches blocked quests**: needs an item first? It says where and how to get it, with two map markers.
@@ -69,7 +69,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 
 - **Click a line:** map pin there, and the map opens.
 - **Shift-click a quest:** link it in chat.
-- **Right-click a line:** show on map, open in quest log, share with party, save for later (until a level you pick, or until you bring it back), hide, abandon (Drop list), try again.
+- **Right-click a line:** show on map, open in quest log, share with party, save for later (until a level you pick, or until you bring it back), hide, skip a quest to pick up, abandon (Drop list), try again.
 - **Click an Equip step:** puts the item on.
 - **The - button** folds the panel to just the Next card; **+** brings the lists back.
 - **Closed it?** Bring it back from the minimap's addon menu (right-click there for the settings), with `/qt`, or with a key.
@@ -81,7 +81,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 | `/qt` | Show or hide the panel |
 | `/qt options` | Open the settings |
 | `/qt stats` | Your leveling stats |
-| `/qt unhide` | Bring back hidden quests and items |
+| `/qt unhide` | Bring back hidden and skipped quests and items |
 | `/qt reset` | Move the panel back to its starting spot |
 | `/qt debug` | Details for a bug report, ready to copy |
 

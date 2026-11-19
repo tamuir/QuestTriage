@@ -545,7 +545,8 @@ function QT.SlowCheck(track, now)
 end
 
 -- The best things to do right now. Returns the ranked list of actions and a list of short reminders:
--- action = { icon, text, sub, loc, kind = "equip"|"quest"|"goto"|nil, data, tip, questID, giverKey, xp, key }
+-- action = { icon, text, sub, loc, kind = "equip"|"quest"|"goto"|nil, data, tip, questID, giverKey, xp, key,
+--   skips = the giver's quests on a pickup: the right-click menu offers to skip each }
 -- Quick fixes (repair, equip) first, then route steps ranked by cost (distance, weighted by style).
 -- A quest you can't finish yet is replaced by the step that unblocks it.
 -- power: { bagUpgrade, train = text, durability, freeSlots, junk }; groups = QT.PickupGroups.
@@ -651,7 +652,7 @@ function QT.BestActions(buckets, power, player, groups, opts)
       local w = batch and (near(g.giver) and 0.3 or 1.2) or 0.7
       if near(g.giver) then hereCount = hereCount + 1 end
       step(yards(g.giver) * w + wait + i, { icon = "pickup", text = pickupText(g), kind = "goto", loc = g.giver, tip = pickupTip(g),
-        giverKey = g.key, key = "pick:" .. g.key, sub = #g.quests > 1 and L["Quests at your level"] or nil })
+        giverKey = g.key, key = "pick:" .. g.key, skips = g.quests, sub = #g.quests > 1 and L["Quests at your level"] or nil })
     end
   end
   for i, e in ipairs(buckets.now) do
@@ -843,7 +844,7 @@ function QT.BuildRows(buckets, player, power, opts, groups)
     end
     add({ style = "hero", icon = a.icon, text = a.text, sub = #meta > 0 and table.concat(meta, "  ·  ") or nil,
       kind = a.kind, data = a.data, loc = a.loc, tip = a.tip, questID = a.questID, key = a.key, pinQuestID = a.pinQuestID, thenLoc = a.thenLoc, thenTitle = a.thenTitle, checklist = a.checklist,
-      yards = a.loc and a.loc.yards, here = a.here, qlevel = a.qlevel })
+      yards = a.loc and a.loc.yards, here = a.here, qlevel = a.qlevel, skips = a.skips })
   end
   local fight = opts.fight and QT.FightCheck(opts.fight, { level = player.level, manaPct = opts.manaPct })
   if fight then add({ style = "alert", icon = "blocker", text = fight }) end
@@ -971,7 +972,7 @@ function QT.BuildRows(buckets, player, power, opts, groups)
             text = (single and string.format("[%d] %s", single.level or 0, single.title or "?")
               or string.format("%s  %s", g.giver.name or "?", colored("ffc8c8c8", L["%d quests"]:format(#g.quests))))
               .. (g.event and ("  " .. colored("ffc8c8c8", g.quests[1].event)) or ""),
-            right = QT.Short(g.giver), questID = single and single.questID or nil })
+            right = QT.Short(g.giver), questID = single and single.questID or nil, skips = g.quests })
         end
       end
       section("pickup", L["Pick up"], "ffffffff", pick, 3)

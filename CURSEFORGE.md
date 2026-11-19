@@ -61,25 +61,23 @@ the featured image.
 
 `next-step.jpg` · `batch-hub.jpg` · `pick-up.png` · `pin-tooltip.jpg` · `gear.png` · `settings.png`
 
-## 4. Automatic uploads (one-time setup)
+## 4. Automatic uploads
 
-1. Create the project on CurseForge with the fields above and note its **Project ID** (shown on the project page).
-2. In `QuestTriage.toc`, replace the commented line with `## X-Curse-Project-ID: <your id>`.
-3. On CurseForge, create an **API token** (your account settings, API tokens).
-4. On GitHub, repo Settings > Secrets and variables > Actions, add a secret named `CF_API_KEY` with that token.
-5. Commit and push step 2. From then on, **releasing is one step**: add a dated section to the top of `CHANGELOG.md`,
-   such as `## [0.5.1] - 2026-11-10`, and push to main. GitHub runs the tests, tags `v0.5.1`, builds the zip (only what
-   the game loads) and uploads it to GitHub Releases and CurseForge for WoW: Forever. The version in the `.toc` is
-   stamped automatically.
+Already set up: the project ID is in `QuestTriage.toc` (`## X-Curse-Project-ID`) and the CurseForge API token is the
+GitHub secret `CF_API_KEY` (repo Settings > Secrets and variables > Actions). If the token is ever replaced, create a
+new one on CurseForge (account settings, API tokens) and update that secret.
 
-The first release (0.5.0) is already in the changelog, so it goes out as soon as steps 1 to 4 are done: after pushing
-the project ID, open GitHub > Actions > Release > **Run workflow**.
+**Releasing is one step**: rename `## [Unreleased]` at the top of `CHANGELOG.md` to a dated section such as
+`## [0.5.9] - 2026-11-20`, and push to main. GitHub runs the tests, tags `v0.5.9`, builds the zip (only what the game
+loads) and uploads it to GitHub Releases and CurseForge for WoW: Forever. The version in the `.toc` is stamped
+automatically.
 
 If CurseForge doesn't list WoW: Forever (game version 1.60.1), the release stops before publishing anything and says so.
 
-## 5. Before you publish
+## 5. Before each release
 
-- [ ] Play a session on the release build; run `/qt debug` once to check pins.
-- [ ] Gallery images uploaded (section 3).
-- [ ] Project ID in the `.toc`, `CF_API_KEY` secret set.
-- [ ] Questie listed as an optional dependency on the project page.
+- [ ] Play a session on the build you're about to release; run `/qt debug` once to check pins.
+- [ ] `sh run-tests.sh` passes.
+- [ ] README changed? Run `sh tools/curseforge-description.sh --update` and paste the description again (section 2).
+- [ ] New or changed screenshots uploaded to the gallery (section 3).
+- [ ] After it's out: reply to the comments the release answers, saying what changed and how to use it.

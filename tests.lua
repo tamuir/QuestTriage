@@ -147,6 +147,7 @@ for i = 1, 6 do table.insert(many, { questID = 100 + i, title = "P" .. i, level 
 local rows = QT.BuildRows(QT.Triage({}, player), player, {}, {}, QT.PickupGroups(many, player))
 assert(rows[1].style == "hero" and rows[1].text == "Pick up P1 from G1" and rows[1].sub:find("<1 min"))
 assert(not has(rows, "^%[12%] P1"), "the Next step isn't listed again")
+assert(rows[1].skips[1].questID == 101 and has(rows, "^%[12%] P2").skips[1].questID == 102, "every pickup row can be skipped")
 assert(count(rows, "^%[12%] P") == 3 and has(rows, "%+2 more") and has(rows, "%[%+%] Pick up").right == "5")
 
 -- "Do now": top 5, grouped by the objective's zone, "(you are here)" on yours, nearest first.

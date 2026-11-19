@@ -15,6 +15,7 @@
 - Compact panel: the new - button folds the panel to just the Next step; + brings the lists back. Also a setting, "Compact panel".
 - Pick up lists quest givers within about 3½ minutes' walk, plus always the nearest three, instead of every giver on the continent.
 - New key binding "Go to the next step": does what clicking the Next card does.
+- Skip a pickup: right-click any quest to pick up, the Next step included, and choose "Skip <quest>". A giver with several quests lists each one. `/qt unhide` brings them back, and a skipped quest you take anyway shows up again.
 - At the quest reward window, Quest Triage names the choice that's a clear upgrade for you, in chat. It never picks for you.
 
 ## [0.5.8] - 2026-11-16

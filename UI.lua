@@ -245,7 +245,14 @@ local function rowMenu(row)
       root:CreateButton(L["Save for later: until level %d"]:format(back), function() save(back) end)
       root:CreateButton(L["Save for later: until I bring it back"], function() save(nil) end)
     end
-    if questID then
+    -- A pickup you don't want (your friends already did it): skip each quest at this giver on its own.
+    for _, p in ipairs(row.skips or {}) do
+      root:CreateButton(L["Skip %s"]:format(p.title or "?"), function()
+        QuestTriageCharDB.hidden[p.questID] = true
+        QT.Render()
+      end)
+    end
+    if questID and not row.skips then
       root:CreateButton(L["Hide from list"], function()
         QuestTriageCharDB.hidden[questID] = true
         local h = QuestTriageCharDB.history[questID]
@@ -307,7 +314,8 @@ local function onRowEnter(row)
   end
   local hint = HINTS[(row.kind == "quest" and row.loc) and "questLoc" or row.kind]
   if hint then GameTooltip:AddLine(hint, 0.4, 1, 0.4, true) end
-  if row.questID then GameTooltip:AddLine(L["Shift-click: link in chat.  Right-click: more."], 0.4, 1, 0.4, true) end
+  if row.skips then GameTooltip:AddLine(L["Right-click: skip a quest you don't want."], 0.4, 1, 0.4, true)
+  elseif row.questID then GameTooltip:AddLine(L["Shift-click: link in chat.  Right-click: more."], 0.4, 1, 0.4, true) end
   GameTooltip:Show()
 end
 
@@ -380,7 +388,7 @@ local function layout(specs)
     r.kind, r.data, r.tip, r.loc, r.pin = s.kind, s.data, s.tip, s.loc, s.pin or s.icon
     r.questID, r.drop, r.yards, r.retry = s.questID, s.drop, s.yards or (s.loc and s.loc.yards), s.retry
     r.pinQuestID, r.thenLoc, r.thenTitle = s.pinQuestID, s.thenLoc, s.thenTitle
-    r.saved, r.qlevel, r.hearth = s.saved, s.qlevel, s.hearth
+    r.saved, r.qlevel, r.hearth, r.skips = s.saved, s.qlevel, s.hearth, s.skips
 
     local left = st.x
     if st.icon then
@@ -973,6 +981,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     setFaded(false)
   elseif event == "QUEST_ACCEPTED" then
     history[arg1] = { accepted = time(), acceptedLevel = UnitLevel("player") }
+    QuestTriageCharDB.hidden[arg1] = nil -- skipped as a pickup but taken after all (shared by a friend): show it
     requestRender()
   elseif event == "QUEST_TURNED_IN" then
     local h = history[arg1] or {}
