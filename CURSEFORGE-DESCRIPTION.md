@@ -2,7 +2,7 @@
 
 Works **with or without Questie**: a bundled catalog of 970 quests (levels 1–60) plans power-leveling routes on its own, and Questie adds more quests to pick up, turn-in NPC names, missing items and monster spawn areas. In English and German.
 
-![Quest Triage in the Barrens: the Next card says to hand in The Stagnant Oasis to Tonga Runetotem, about 2 minutes north-west, worth 13% of a level, above the sorted quest lists](https://raw.githubusercontent.com/tamuir/QuestTriage/main/docs/images/next-step.jpg)
+![Quest Triage in the Barrens: the Next card says Hand in Enraged Thunder Lizards, +1,700 XP, about a minute south-west, with the route timeline under it (one stop done, the current hand-in, Hand in Lakota'mani next, 31 more stops, about 95 minutes), then the quest lists: Turn in, Do now, Needs a group, Save for later and Drop](https://raw.githubusercontent.com/tamuir/QuestTriage/main/docs/images/next-step.jpg)
 
 ## Leveling guide that adapts to you
 
