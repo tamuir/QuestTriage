@@ -1,6 +1,6 @@
 # Security
 
-Quest Triage runs only inside World of Warcraft and sends nothing over the network. Everything it stores stays in your own SavedVariables.
+Quest Triage runs only inside World of Warcraft and sends nothing outside the game. Everything it stores stays in your own SavedVariables. The one thing it ever sends is opt-in: with party coordination on (`/qt party on`, off by default) it shares your current quest ID, remaining objective credits and the flight connections you can afford with your party, through the game's addon channel.
 
 If you find a security problem (for example, a way the addon could leak information or be abused by another addon or by chat input), please report it privately: open the repository's **Security** tab and choose **Report a vulnerability**. Please don't open a public issue for it.
 

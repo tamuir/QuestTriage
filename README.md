@@ -4,13 +4,13 @@
 
 **Quest Triage is a leveling guide and quest helper for WoW: Forever that tells you the single best thing to do next.** It reads your quest log, bags, gear and position, then points a live arrow at your next quest, hand-in or pick-up. No route to memorize and no guide to read: one card says what to do now.
 
-Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn areas come from your Questie install. In English and German.
+Works **with or without Questie**: a bundled catalog of 970 quests (levels 1–60) plans power-leveling routes on its own, and Questie adds more quests to pick up, turn-in NPC names, missing items and monster spawn areas. In English and German.
 
 ![Quest Triage in the Barrens: the Next card says to hand in The Stagnant Oasis to Tonga Runetotem, about 2 minutes north-west, worth 13% of a level, above the sorted quest lists](docs/images/next-step.jpg)
 
 ## Leveling guide that adapts to you
 
-**Power Leveling** starts automatically and compares trips from your current position. It includes 970 quests from levels 1–60 and can start with an empty log. Near the next level it compares ready hand-ins with nearby work that covers the XP gap. The compact panel shows your next action, estimated time to level and the XP left after the current hand-in. Expand it with **+** and the route hangs off the Next card as a numbered timeline: the stop you just finished (checked once the game confirms it), the one you're on and the next, with the XP each hand-in pays and the time to level. Click the footer for ten stops at a time and scroll with the mouse wheel; hover a stop for its NPC, coordinates and every step. It updates as you move, earn XP and finish quests.
+**Power Leveling** starts automatically and compares trips from your current position: pick up, objectives, travel and hand-in, scored by XP per minute. It includes 970 quests from levels 1–60 and can start with an empty log. Near the next level it compares ready hand-ins with nearby work that covers the XP gap, and picks the trip that levels you soonest. The compact panel shows your next action, the XP left after the current hand-in and one leveling stat you choose: time to level, XP per hour or quests to level. Expand it with **+** and the route hangs off the Next card as a numbered timeline: the stop you just finished (checked once the game confirms it), the one you're on and the next, with the XP each hand-in pays and the time to level. Click the footer for ten stops at a time and scroll with the mouse wheel; hover a stop for its NPC, coordinates and every step. It updates as you move, earn XP and finish quests.
 
 ![The Quest Triage route timeline: the Next card says Hand in Enraged Thunder Lizards, +1,700 XP, about a minute south-west; under it a gold line runs from a checked stop through stop 2, the current hand-in, to stop 3, Hand in Lakota'mani for +1,300 XP, then 31 more stops, about 92 minutes and 23,000 quest XP](docs/images/route.png)
 
@@ -22,6 +22,8 @@ Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn area
 - **Three leveling styles.** Power Leveling (default) plans whole trips; Batch clears every quest in a hub before you leave and does nearby objectives in one trip; One at a time finishes, hands in, then picks up the next.
 - **Stays on track.** It sticks with the quest you're doing and finishes what you started instead of jumping around.
 - **Timed quests first.** Need for a Cure and other quests with a timer jump to the top, with the minutes left. Prefer them only near the end, or never? It's a setting.
+- **Plans your travel.** Boats, zeppelins, the tram, portals, flight paths you know (and ones worth learning on the way), your hearthstone and class teleports, all in one route. Flight times are measured from your own flights.
+- **Level with friends.** Turn on party coordination (`/qt party on`, off by default) and your group lines up on the leader's quest, stays on an objective someone still needs, and shares flights everyone can take.
 
 ![The Next card in a quest hub: Hand in Raptor Thieves to Gazrog, 2 more to do here](docs/images/batch-hub.jpg)
 
@@ -92,7 +94,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 | `/qt route bands` | Browse catalog zones for your race and faction by level band |
 | `/qt route 21` | Preview up to three trips for that level from your current position |
 | `/qt party on` or `/qt party off` | Toggle party route coordination on this character |
-| `/qt stats` | Your leveling stats |
+| `/qt stats` | Your leveling stats: XP per hour (session and recent), time to level, how fast objective credits come in |
 | `/qt unhide` | Bring back hidden and skipped quests and items |
 | `/qt reset` | Move the panel back to its starting spot |
 | `/qt debug` | Details for a bug report, ready to copy |

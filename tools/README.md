@@ -22,7 +22,7 @@ and other players' names stay out.
 | World map open, mouse over the pin so its tooltip shows | `/qtshots pin-tooltip` |
 | An "Equip …" step on the Next card | `/qtshots gear` |
 | Esc > Options > AddOns > Quest Triage | `/qtshots settings` |
-| Power Leveling on, panel expanded with **+** so the route shows by stop | `/qtshots route` |
+| Power Leveling on, panel expanded with **+** so the route timeline shows under the Next card | `/qtshots route` |
 
 A shot keeps one window plus the tooltip over it: Settings, else the world map, else the panel. Retaking a name
 replaces its old record.

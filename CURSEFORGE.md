@@ -3,8 +3,8 @@
 Everything for the CurseForge project page, in the order the form asks for it, written so players searching for a
 leveling addon or quest helper find it. Search on CurseForge and Google weighs, in order: the **name**, the
 **summary**, the **first lines of the description**, the **categories**, then the rest of the description and image
-captions. Each field below puts the words players actually search for ("leveling", "quest helper", "guide",
-"WoW Forever", "Questie", "arrow", "gear upgrade") where they count, without keyword stuffing.
+captions. Each field below puts the words players actually search for ("leveling", "power leveling", "quest helper",
+"guide", "route", "WoW Forever", "Questie", "arrow", "gear upgrade") where they count, without keyword stuffing.
 
 ## 1. Project fields
 
@@ -12,7 +12,7 @@ captions. Each field below puts the words players actually search for ("leveling
 | --- | --- | --- |
 | Name | **Quest Triage - Leveling Guide & Quest Helper** | The brand plus the two phrases people search for. 44 characters, so it isn't cut off in search results. |
 | Project URL (slug) | `quest-triage` | Short and readable. It can't easily be changed later. |
-| Summary | **Leveling guide and quest helper for WoW Forever: your best next quest with a live arrow, nearby quests, gear upgrades and what to skip.** | Keywords first; 136 characters, so the whole line shows in search snippets. |
+| Summary | **Leveling guide and quest helper for WoW Forever: power-leveling routes, your next quest with a live arrow, gear upgrades and what to skip.** | Keywords first; 139 characters, so the whole line shows in search snippets. |
 | Main category | Quests & Leveling | Where leveling players browse. |
 | Extra categories | Map & Minimap · Bags & Inventory | Map pins and arrow; auto-sell grays and gear upgrades. Only add categories that honestly fit. |
 | Game version | WoW Forever (the `.toc` says `## Interface: 16001`) | Only claim what's tested. |
