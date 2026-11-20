@@ -10,7 +10,11 @@ Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn area
 
 ## Leveling guide that adapts to you
 
-**Power Leveling** starts automatically and compares trips from your current position. It includes 970 quests from levels 1–60 and can start with an empty log. Near the next level it compares ready hand-ins with nearby work that covers the XP gap. The compact panel shows your next action, estimated time to level and the XP left after the current hand-in. Expand it with **+** to see the full route, including NPCs, coordinates, travel and rewards. It updates as you move, earn XP and finish quests.
+**Power Leveling** starts automatically and compares trips from your current position. It includes 970 quests from levels 1–60 and can start with an empty log. Near the next level it compares ready hand-ins with nearby work that covers the XP gap. The compact panel shows your next action, estimated time to level and the XP left after the current hand-in. Expand it with **+** and the route hangs off the Next card as a numbered timeline: the stop you just finished (checked once the game confirms it), the one you're on and the next, with the XP each hand-in pays and the time to level. Click the footer for ten stops at a time and scroll with the mouse wheel; hover a stop for its NPC, coordinates and every step. It updates as you move, earn XP and finish quests.
+
+![The Quest Triage route timeline: the Next card says Hand in Enraged Thunder Lizards, +1,700 XP, about a minute south-west; under it a gold line runs from a checked stop through stop 2, the current hand-in, to stop 3, Hand in Lakota'mani for +1,300 XP, then 31 more stops, about 92 minutes and 23,000 quest XP](docs/images/route.png)
+
+*The route at a glance: done, now and next, numbered, with the XP each stop pays.*
 
 - **One clear next step.** Hand in, pick up, go do, or fix something first, chosen for where you're standing right now.
 - **Live waypoint arrow and travel time** ("~2 min NW"), plus a map pin with a full tooltip.
@@ -61,7 +65,7 @@ Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn area
 
 Readable colors (7:1 contrast), every line one row, details on hover, adjustable size and background opacity (see-through text gets a dark outline, so it stays readable over anything), and it fades in combat so it never blocks the fight.
 
-![Quest Triage settings: leveling style, timed quests first Always, lock panel position, sell gray items automatically, hearthstone tips, open the map when pinning, fade in combat, panel size and background opacity](docs/images/settings.png)
+![Quest Triage settings in the game's Options window: the leveling style menu open on Power Leveling, Batch by hub and One at a time, then timed quests first, compact leveling stat, compact panel, lock panel position, sell gray items automatically, hearthstone tips, open the map when pinning, fade in combat, panel size and background opacity](docs/images/settings.png)
 
 *Simple settings in the game's own Options window: Power Leveling, Batch or one at a time, when timed quests go first, compact panel and its stat, auto-sell greys, opening the map when you pin, lock, size, background opacity, combat fade.*
 
@@ -74,6 +78,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 - **Right-click a line:** show on map, open in quest log, share with party, save for later (until a level you pick, or until you bring it back), hide, skip a quest to pick up, abandon (Drop list), try again.
 - **Click an Equip step:** puts the item on.
 - **+** shows the route and quest lists. **−** folds the panel to the Next card.
+- **Route footer:** click for ten stops at a time (mouse wheel scrolls them), click again for done, now and next.
 - **Closed it?** Bring it back from the minimap's addon menu (right-click there for the settings), with `/qt`, or with a key.
 - **Keys** (Options > Keybindings > AddOns): show or hide the panel, and go to the next step (same as clicking the card).
 - **At the reward window** it names the choice that's a clear upgrade for you, in chat. The pick stays yours.

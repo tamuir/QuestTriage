@@ -44,7 +44,8 @@ CurseForge lets you give every gallery image a title and description; both are i
 | `pick-up.png` | Quest helper: never miss a quest nearby | Nearby quest givers worth your time, nearest first, with the next one on the card. |
 | `pin-tooltip.jpg` | Map pins that explain themselves | Hover the pin for the step, what you need first, coordinates and distance, and where to go after. |
 | `gear.png` | Gear upgrades for your class | Upgrades judged on real stats, one click to equip. |
-| `settings.png` | Settings: Power Leveling, batch or one at a time | Leveling style, compact panel, auto-sell greys, size and combat fade. |
+| `settings.png` | Settings: Power Leveling, batch or one at a time | Leveling style, compact panel and its stat, auto-sell greys, size and combat fade. |
+| `route.png` | Leveling route: done, now and next | The route hangs off the Next card as a numbered timeline with the XP each stop pays and the time to level. |
 
 Set `next-step.jpg` as the **featured image**: it explains the addon in one look.
 
@@ -59,7 +60,7 @@ Set `next-step.jpg` as the **featured image**: it explains the addon in one look
 Upload these from `docs/images/`, with the titles and descriptions from the table in section 2. Make `next-step.jpg`
 the featured image.
 
-`next-step.jpg` · `batch-hub.jpg` · `pick-up.png` · `pin-tooltip.jpg` · `gear.png` · `settings.png`
+`next-step.jpg` · `route.png` · `batch-hub.jpg` · `pick-up.png` · `pin-tooltip.jpg` · `gear.png` · `settings.png`
 
 ## 4. Automatic uploads
 

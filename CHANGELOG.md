@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-11-20
+
 - Power Leveling: a new leveling style, now the default. It plans whole trips (pick up, objectives, travel, hand-in) from where you stand, using 970 bundled quests from levels 1–60, so it works with an empty quest log and without Questie. Profiles still on the old Batch default switch once; pick another style in Settings any time.
 - Near the next level it compares ready hand-ins with nearby work that covers the XP gap, and picks the trip that levels you soonest.
 - Travel: boats, zeppelins, the tram, portals, flight paths you know (and ones worth learning), hearthstone and class teleports. Flight times are measured from your own flights.
