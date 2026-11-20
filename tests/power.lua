@@ -128,6 +128,17 @@ assert(QT.PlanToLevel(banked,origin,{speed=7,edges={}},gap)==nil,"one XP short c
 local short=QT.PlanToLevel({banked[1]},campA,transit,399)
 assert(#short.steps==1 and short.steps[1].icon=="turnin")
 
+-- Early in a level the next step is the best trip, but the expanded route still runs to the ding.
+local spread={ready(1,"A",500,at(100)),ready(2,"B",500,at(200)),ready(3,"C",500,at(3000))}
+local early=assert(QT.PlanTrips(spread,origin,{speed=7,edges={}}))
+local firstStep=early.steps[1]
+QT.ExtendRoute(early,spread,{speed=7,edges={}},1400)
+assert(early.steps[1]==firstStep and early.more and early.xp+early.more.xp==1500,"extension keeps the next step")
+local routeRows,routeTitle=QT.RouteRows(early,21)
+assert(routeTitle:match("^Level 22 in") and #routeRows==3,"one stop per hand-in, all the way to level 22")
+UnitLevel=function() return 21 end
+assert(QT.RouteOverview(early):find("Hand in C",1,true),"/qt route shows the whole route too")
+
 -- The real Taurajo follow-up becomes eligible after Tribes. A shard already in
 -- the bags makes it a second hand-in with no hunting leg.
 local originalGuide=QT.GuideReady
@@ -176,17 +187,50 @@ assert(not report:find("1–10",1,true))
 local visible=QT.BuildRows(QT.Triage(readyLog,player21),player21,{},{plan=hearthTrip,style="power",compact=true})
 assert(#visible==1 and visible[1].sub=="+1,650 XP · 2,013 XP left" and visible[1].planned)
 local expanded=QT.BuildRows(QT.Triage(readyLog,player21),player21,{},{plan=hearthTrip,style="power"})
-local stops,actions=0,0
+local stops,actions={},0
 for _,row in ipairs(expanded) do
+  assert(row.style~="routeStep","one row per stop")
+  assert(not (row.style=="header" and row.data=="route"),"the stepper hangs off the Next card, no header")
+  if row.style=="routeMore" then assert(row.text:match("^Level 22 in ~%d+ min$") and not row.kind and not row.rail and row.tip[1]:find("XP needed",1,true)) end
   if row.style=="routeStop" then
-    stops=stops+1
-    if stops==3 then assert(row.loc==thungrim and row.kind=="goto") end
-  elseif row.style=="routeStep" then
-    actions=actions+1
-    assert(report:find(row.text,1,true))
+    stops[#stops+1]=row
+    for i=2,#row.tip do actions=actions+1; assert(report:find(row.tip[i],1,true)) end
   end
 end
-assert(stops==3 and actions==4)
+assert(#stops==3 and actions==4,"every stop, steps in the tooltip")
+assert(stops[1].current and stops[1].num==1 and stops[1].text=="Hand in Tribes at War" and stops[1].right=="+2,900 XP")
+assert(not stops[2].num and stops[2].text:find("Hearth to The Crossroads",1,true),"travel has no number")
+assert(stops[3].num==2 and stops[3].last and stops[3].loc==thungrim and stops[3].kind=="goto" and stops[3].text=="Hand in Speak with Thun'grim")
+-- Game data checks a stop off: Tribes and the shards handed in finish the Mangletooth stop, once.
+local flagged=C_QuestLog.IsQuestFlaggedCompleted
+C_QuestLog.IsQuestFlaggedCompleted=function(id) return id==878 or id==5052 end
+local done={}
+QT.RecordRouteDone(hearthTrip,readyLog,done)
+QT.RecordRouteDone(hearthTrip,readyLog,done)
+assert(#done==1 and done[1].text=="Hand in Tribes at War","only the stop game data shows done, once")
+C_QuestLog.IsQuestFlaggedCompleted=function() return false end
+local partial={}
+QT.RecordRouteDone(hearthTrip,{},partial)
+assert(#partial==0,"nothing done, nothing checked")
+C_QuestLog.IsQuestFlaggedCompleted=flagged
+-- Every stop is listed in order (done, current, the rest); the panel shows ten at a time from the last done.
+local realRows=QT.RouteRows
+QT.RouteRows=function() local s={} for i=1,30 do s[i]={style="routeStop",text="S"..i,tip={},checks={{}}} end return s,"Level 22 in ~9 min" end
+local list,foot={}
+for _,r in ipairs(QT.BuildRows(QT.Triage(readyLog,player21),player21,{},{plan=hearthTrip,style="power",routeDone={{text="A"},{text="B"}}})) do
+  if r.style=="routeStop" then list[#list+1]=r elseif r.style=="routeMore" then foot=r end
+end
+assert(#list==32 and list[2].done and list[2].step==2 and list[3].current and list[3].num==3 and list[32].step==32)
+assert(foot.total==32 and foot.doneCount==2 and not foot.done and foot.title=="Level 22 in ~9 min")
+QT.RouteRows=realRows
+local first,last,max=QT.RouteWindow(32,2,3)
+assert(first==2 and last==4 and max==29,"folded: the last done, now, next")
+assert(select(2,QT.RouteWindow(32,0,3))==3,"nothing done yet: now and the next two")
+first,last,max=QT.RouteWindow(32,2,10)
+assert(first==2 and last==11 and max==22,"open: ten from the last done")
+assert(select(2,QT.RouteWindow(6,3,10))==6,"short routes show whole")
+first,last=QT.RouteWindow(32,2,10,99)
+assert(first==23 and last==32,"scrolling stops at the end")
 
 -- Rebuild the normal panel from the next two snapshots of XP, log and offers.
 -- Neither route advancement nor the inventory hint uses a slash command.

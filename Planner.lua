@@ -233,6 +233,40 @@ function QT.PlanTrips(jobs, origin, travel, keep)
   return best
 end
 
+-- Display only: keep adding the best XP-per-minute trip from where the last one ends, so the
+-- expanded panel shows the road to the next level. The first trip, and so the next step, is unchanged.
+function QT.ExtendRoute(plan, jobs, travel, gap)
+  if not plan.at then return end
+  local search, taken, pool = network(travel), {}, {}
+  local function take(job)
+    taken[job.id] = true
+    for _, child in ipairs(job.followups or {}) do pool[#pool+1] = child end
+  end
+  for _, job in ipairs(jobs) do pool[#pool+1] = job end
+  for _, job in ipairs(plan.jobs) do take(job) end
+  local more = {steps={}, jobs={}, seconds=0, xp=0, gap=gap}
+  local at, used, xp = plan.at, plan.used, plan.xp
+  -- shortcut: greedy and capped at 12 trips to stay cheap on the 2 s refresh; raise the cap if routes stop short.
+  for _ = 1, 12 do
+    if xp >= gap then break end
+    local best
+    for _, job in ipairs(pool) do
+      if not taken[job.id] then
+        local trip = assess({job}, at, search, nil, used)
+        if trip and (not best or trip.score > best.score or (trip.score == best.score and job.id < best.jobs[1].id)) then
+          best = trip
+        end
+      end
+    end
+    if not best then break end
+    for _, s in ipairs(best.steps) do more.steps[#more.steps+1] = s end
+    for _, job in ipairs(best.jobs) do more.jobs[#more.jobs+1] = job; take(job) end
+    more.seconds, more.xp, xp = more.seconds + best.seconds, more.xp + best.xp, xp + best.xp
+    at, used = best.at, best.used
+  end
+  if more.steps[1] then plan.more = more end
+end
+
 local locCache = {}
 local function location(p)
   local loc = locCache[p]
@@ -256,6 +290,8 @@ local function sameStop(a,b)
     and a.x and b.x and a.y and b.y and math.abs(a.x-b.x)<0.05 and math.abs(a.y-b.y)<0.05
 end
 
+local DIM = "|cffaaaaaa"
+
 local function handinReward(xp,remaining,target)
   local text=L["+%s XP"]:format(QT.Commas(xp))
   if remaining and remaining>0 then
@@ -266,23 +302,25 @@ local function handinReward(xp,remaining,target)
 end
 
 function QT.RouteRows(plan,level)
-  local minutes = math.ceil(plan.seconds/60)
-  local rows = {}
+  local more = plan.more or {steps={},jobs={},seconds=0,xp=0}
+  local xp, gap = plan.xp+more.xp, plan.gap or more.gap
+  local minutes = math.ceil((plan.seconds+more.seconds)/60)
   local target = plan.targetLevel or (level or UnitLevel("player"))+1
-  local function add(style,text,loc)
-    rows[#rows+1]={style=style,text=text,loc=loc,kind=loc and "goto" or nil}
-  end
-  if plan.gap then
-    add("header",L["Level %d in ~%d min"]:format(target,minutes))
-    add("note",L["%s XP needed · %s XP on this trip"]:format(QT.Commas(plan.gap),QT.Commas(plan.xp)))
+  local title, note
+  if gap and xp>=gap then
+    title = L["Level %d in ~%d min"]:format(target,minutes)
+    note = L["%s XP needed · %s XP on this trip"]:format(QT.Commas(gap),QT.Commas(xp))
   else
-    add("header",L["~%d min · %s quest XP"]:format(minutes,QT.Commas(plan.xp)))
-    if plan.shortfall then add("note",L["After this trip: %s XP to level %d"]:format(QT.Commas(plan.shortfall),target)) end
+    title = L["~%d min · %s quest XP"]:format(minutes,QT.Commas(xp))
+    local short = gap and gap-xp or plan.shortfall
+    if short then note = L["After this trip: %s XP to level %d"]:format(QT.Commas(short),target) end
   end
-  local jobs = {}
-  for _,job in ipairs(plan.jobs) do jobs[job.id] = job end
-  local lastStop, stop, remaining = nil, 0, plan.gap
-  for _,s in ipairs(plan.steps) do
+  local jobs, steps = {}, {}
+  for _,list in ipairs({plan.jobs,more.jobs}) do for _,job in ipairs(list) do jobs[job.id] = job end end
+  for _,list in ipairs({plan.steps,more.steps}) do for _,s in ipairs(list) do steps[#steps+1] = s end end
+  -- One row per stop: what to do there, XP on the right; the full label and every step go in the tooltip.
+  local stops, cur, lastStop, remaining = {}, nil, nil, gap
+  for _,s in ipairs(steps) do
     local job = jobs[s.questID]
     local interaction = s.icon=="pickup" or s.icon=="turnin" or s.icon=="objective"
     local place = interaction and stopLabel(s.loc)
@@ -291,30 +329,52 @@ function QT.RouteRows(plan,level)
       text = L["Pick up %s"]:format(job.title)
     end
     if s.bagReady then text = text.." · "..L["quest item in bags"] end
+    local action = text
     if s.icon=="turnin" and job then
       local reward
       reward,remaining=handinReward(job.xp,remaining,target)
       text=text.." · "..reward
     end
     if not place or not sameStop(lastStop,s.loc) then
-      stop = stop+1
+      local n = #stops+1
       local boarding = s.travel and stopLabel(s.boarding)
-      local loc=place and s.loc or s.boarding
-      add("routeStop",stop..". "..(place or text)..(boarding and (" · "..boarding) or ""),loc)
+      local label = n..". "..(place or text)..(boarding and (" · "..boarding) or "")
+      -- Travel is the connective tissue between stops: dimmed, details in the tooltip.
+      cur = {style="routeStop", label=label, text=DIM..text.."|r",
+        loc=place and s.loc or s.boarding, steps={}, checks={}, xp=0, key=s.key or label}
+      cur.kind = cur.loc and "goto" or nil
+      stops[n] = cur
     end
-    if place then add("routeStep",text) end
-    if s.reason then add("routeStep",s.reason) end
+    if place then cur.steps[#cur.steps+1] = text end
+    if s.reason then cur.steps[#cur.steps+1] = s.reason end
+    if s.icon=="turnin" and job then cur.xp = cur.xp+job.xp end
+    if interaction and s.questID then cur.checks[#cur.checks+1] = {icon=s.icon, questID=s.questID} end
+    -- The row says the stop's main action (a hand-in beats a pickup beats an objective); a camp names
+    -- the quest and, dimmed, what to find there.
+    if interaction and (not cur.icon or (s.icon=="turnin" and cur.icon~="turnin")) then
+      local camp = s.icon=="objective" and s.loc.name ~= s.loc.zone and s.loc.name
+      cur.icon = s.icon
+      cur.text = camp and ((job and job.title or action)..DIM.." · "..camp.."|r") or action
+    end
     lastStop = place and s.loc or nil
   end
-  return rows
+  if stops[1] then stops[#stops].last = true end
+  for _,stop in ipairs(stops) do
+    stop.tip = {stop.label}
+    for _,line in ipairs(stop.steps) do stop.tip[#stop.tip+1] = line end
+    if stop.xp > 0 then stop.right = L["+%s XP"]:format(QT.Commas(stop.xp)) end
+  end
+  return stops, title, note, minutes
 end
 
 function QT.RouteOverview(plan)
   if not plan then return L["No route is available from your current position."] end
-  local lines={}
-  for _,r in ipairs(QT.RouteRows(plan)) do
-    if r.style=="routeStop" then lines[#lines+1]="" end
-    lines[#lines+1]=(r.style=="routeStep" and "    " or "")..r.text
+  local stops, title, note = QT.RouteRows(plan)
+  local lines={title, note}
+  for _,stop in ipairs(stops) do
+    lines[#lines+1]=""
+    lines[#lines+1]=stop.label
+    for _,line in ipairs(stop.steps) do lines[#lines+1]="    "..line end
   end
   return table.concat(lines,"\n")
 end
@@ -534,11 +594,13 @@ function QT.BuildPowerPlan(player, buckets, offers, origin, travel, goalOnly)
     local goal=QT.PlanToLevel(jobs,origin,travel,gap,db.committed)
     if goal then goal.targetLevel=player.level+1; return goal end
     local partial=QT.PlanTrips(jobs,origin,travel,db.committed)
-    if partial then partial.shortfall=math.max(0,gap-partial.xp) end
+    if partial then partial.shortfall=math.max(0,gap-partial.xp); QT.ExtendRoute(partial,jobs,travel,gap) end
     return partial
   end
   if goalOnly then return end
-  return QT.PlanTrips(jobs, origin, travel, db.committed)
+  local plan=QT.PlanTrips(jobs, origin, travel, db.committed)
+  if plan and gap>0 then QT.ExtendRoute(plan,jobs,travel,gap) end
+  return plan
 end
 
 function QT.PowerAction(plan, player)
@@ -581,4 +643,35 @@ function QT.PowerAction(plan, player)
   return { text=first.text, planned=true, stepDetail=stepDetail, icon=first.travel and "hearth" or first.icon, sub=reason or (plan.steps[2] and plan.steps[2].text) or tip[1],
     loc=loc, kind=loc and "goto" or "quest", data=first.questID, key=first.key, skips=first.icon=="pickup" and {{questID=first.questID,title=QT.RouteQuests[first.questID] and QT.RouteQuests[first.questID].title or first.text}} or nil,
     questID=first.questID, tip=tip }
+end
+
+-- Stops of the last route that game data now shows as done (picked up, objectives complete, handed in) are
+-- added to done = { {key, text}, ... } once each, so the timeline can check them off. Never on a guess:
+-- a camp stop only counts once its whole quest is complete.
+function QT.RecordRouteDone(prev, quests, done)
+  if not prev then return end
+  local log, have = {}, {}
+  for _, q in ipairs(quests or {}) do log[q.questID] = q end
+  for _, s in ipairs(done) do have[s.key] = true end
+  local function finished(c)
+    if C_QuestLog.IsQuestFlaggedCompleted(c.questID) then return true end
+    local q = log[c.questID]
+    return q ~= nil and (c.icon == "pickup" or (c.icon == "objective" and q.isComplete == true))
+  end
+  for _, stop in ipairs((QT.RouteRows(prev))) do
+    local ok = stop.checks[1] ~= nil and not have[stop.key]
+    for _, c in ipairs(stop.checks) do ok = ok and finished(c) end
+    if ok then
+      done[#done+1] = { key = stop.key, text = (stop.text:gsub("|c%x%x%x%x%x%x%x%x", ""):gsub("|r", "")) }
+      have[stop.key] = true
+    end
+  end
+end
+
+-- The panel shows the route a few stops at a time (size). Unscrolled (offset nil) the window starts at the
+-- last stop done: done, now, next. Returns the first and last step shown and the largest offset.
+function QT.RouteWindow(total, done, size, offset)
+  local max = math.max(0, total - size)
+  local first = math.max(0, math.min(max, offset or done - 1))
+  return first + 1, math.min(total, first + size), max
 end

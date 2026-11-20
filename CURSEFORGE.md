@@ -44,7 +44,7 @@ CurseForge lets you give every gallery image a title and description; both are i
 | `pick-up.png` | Quest helper: never miss a quest nearby | Nearby quest givers worth your time, nearest first, with the next one on the card. |
 | `pin-tooltip.jpg` | Map pins that explain themselves | Hover the pin for the step, what you need first, coordinates and distance, and where to go after. |
 | `gear.png` | Gear upgrades for your class | Upgrades judged on real stats, one click to equip. |
-| `settings.png` | Settings: batch or one at a time | Leveling style, auto-sell greys, size and combat fade. |
+| `settings.png` | Settings: Power Leveling, batch or one at a time | Leveling style, compact panel, auto-sell greys, size and combat fade. |
 
 Set `next-step.jpg` as the **featured image**: it explains the addon in one look.
 

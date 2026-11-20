@@ -272,6 +272,11 @@ local function rowMenu(row)
   end)
 end
 
+-- The route: folded to ROUTE_FOLDED stops (done, now, next) at every login, opened to a window of ROUTE_OPEN that
+-- the mouse wheel scrolls (routeOffset; nil = start at the last stop done).
+local routeOpen, routeOffset, routeWindow, onRouteWheel = false
+local ROUTE_FOLDED, ROUTE_OPEN = 3, 10
+
 local function onRowClick(row, button)
   if button == "RightButton" then
     if row.questID or row.loc or row.kind == "equip" then rowMenu(row) end
@@ -289,6 +294,9 @@ local function onRowClick(row, button)
     end
   elseif row.kind == "bags" then
     OpenAllBags() -- using the item for you would need a secure button; you right-click it
+  elseif row.kind == "routeToggle" then
+    routeOpen, routeOffset = not routeOpen, nil
+    QT.Render()
   elseif row.kind == "toggle" then
     QuestTriageDB.expanded[row.data] = not QuestTriageDB.expanded[row.data]
     QT.Render()
@@ -302,6 +310,7 @@ local HINTS = {
   equip = L["Click: put it on. Right-click: don't suggest it."],
   bags = L["Click: open your bags."],
   toggle = L["Click: show or hide."],
+  routeToggle = L["Click: show or hide."],
 }
 
 -- Details live here, not in the panel: objectives, reason, exact location, XP, then what clicks do.
@@ -363,6 +372,33 @@ local function onRowEnter(row)
   GameTooltip:Show()
 end
 
+-- The route timeline. NODE_X lines its nodes up under the centre of the Next card's icon.
+local NODE_X, GOLD, RAIL_DIM, CARD = 21, { 1, 0.82, 0 }, { 0.62, 0.58, 0.48 }, { 0.1, 0.08, 0.045 }
+local nodeFont = CreateFont("QuestTriageFontNode") -- the step numbers inside the route's nodes
+nodeFont:SetFont(STANDARD_TEXT_FONT, 9, "")
+local function circle(r, sublevel)
+  local t = r:CreateTexture(nil, "ARTWORK", nil, sublevel)
+  local mask = r:CreateMaskTexture()
+  mask:SetTexture("Interface\\CharacterFrame\\TempPortraitAlphaMask", "CLAMPTOBLACKADDITIVE", "CLAMPTOBLACKADDITIVE")
+  mask:SetAllPoints(t)
+  t:AddMaskTexture(mask)
+  return t
+end
+local function nodeAt(t, size, h, color)
+  t:SetShown(size and true or false)
+  if not size then return end
+  t:ClearAllPoints()
+  t:SetSize(size, size)
+  t:SetPoint("CENTER", t:GetParent(), "TOPLEFT", NODE_X, -h / 2)
+  t:SetColorTexture(color[1], color[2], color[3], 1)
+end
+-- An atlas this client lacks would leave the row's previous picture in place: show nothing instead.
+local function setAtlas(t, name)
+  if not name or (C_Texture and C_Texture.GetAtlasInfo and not C_Texture.GetAtlasInfo(name)) then return false end
+  t:SetAtlas(name)
+  return true
+end
+
 local rows = {}
 local function getRow(i)
   local r = rows[i]
@@ -380,7 +416,13 @@ local function getRow(i)
   r.line:SetPoint("TOPLEFT", 0, 0)
   r.line:SetPoint("TOPRIGHT", 0, 0)
   r.line:SetColorTexture(0.72, 0.68, 0.57, 0.45)
-  r.icon = r:CreateTexture(nil, "ARTWORK")
+  r.icon = r:CreateTexture(nil, "ARTWORK", nil, 3)
+  -- Route timeline: the line, and a node of up to three circles (ring, socket, core) under the icon.
+  r.rail = r:CreateTexture(nil, "BORDER")
+  r.rail:SetWidth(2)
+  r.rail:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.45)
+  r.ring, r.socket = circle(r, 0), circle(r, 1)
+  r.num = r:CreateFontString(nil, "OVERLAY", "QuestTriageFontNode")
   r.arrow = r:CreateTexture(nil, "ARTWORK")
   r.arrow:SetAtlas("UI-HUD-Minimap-Arrow-Player")
   r.arrow:SetSize(28, 28)
@@ -407,6 +449,7 @@ local function getRow(i)
   r.bar.bg:SetColorTexture(1, 1, 1, 0.12)
   r:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
   r:SetScript("OnClick", onRowClick)
+  r:SetScript("OnMouseWheel", function(_, delta) onRouteWheel(delta) end)
   r:SetScript("OnEnter", onRowEnter)
   r:SetScript("OnLeave", function(self)
     if hoveredForecast == self then hoveredForecast = nil end
@@ -426,8 +469,8 @@ local STYLE = {
   item   = { font = "QuestTriageFontItem", icon = 12, x = 6, gap = 1 },
   alert  = { font = "QuestTriageFontItem", icon = 12, x = 8, gap = 3 },
   more   = { font = "QuestTriageFontMeta", x = 24, gap = 0 },
-  routeStop = { font = "QuestTriageFontHeader", x = 8, gap = 4 },
-  routeStep = { font = "QuestTriageFontItem", x = 18, gap = 1 },
+  routeStop = { font = "QuestTriageFontItem", x = 37, gap = 0 },
+  routeMore = { font = "QuestTriageFontMeta", x = 37, gap = 0 },
 }
 
 local heroRow -- the Next card, whose arrow follows your facing
@@ -447,6 +490,15 @@ local readyXP = xpTrack:CreateTexture(nil, "ARTWORK")
 readyXP:SetHeight(3)
 readyXP:SetColorTexture(0.68, 0.88, 1, 1)
 
+-- Above the rows, so their card ground doesn't cover it.
+local routeBar = CreateFrame("Frame", nil, content)
+routeBar:SetFrameLevel(content:GetFrameLevel() + 20)
+local routeTrack = routeBar:CreateTexture(nil, "ARTWORK")
+routeTrack:SetAllPoints()
+routeTrack:SetColorTexture(1, 1, 1, 0.08)
+local routeThumb = routeBar:CreateTexture(nil, "OVERLAY")
+routeThumb:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], 0.6)
+
 local function layout(specs)
   local compact = QuestTriageDB.opts.compact
   local width = compact and 300 or WIDTH
@@ -457,6 +509,28 @@ local function layout(specs)
   local y = 0
   xpTrack:Hide()
   heroRow = nil
+  -- The route shows a window of its stops: folded, the last one done, the current and the next; open, ten
+  -- that the wheel scrolls. Clicking the footer folds and opens it; it says what is out of view.
+  local routeFirst, routeLast, routeMax, routeSize
+  for _, s in ipairs(specs) do
+    if s.style == "routeMore" then
+      routeSize = routeOpen and ROUTE_OPEN or ROUTE_FOLDED
+      routeFirst, routeLast, routeMax = QT.RouteWindow(s.total, s.doneCount, routeSize, routeOpen and routeOffset or nil)
+      local hidden = s.total - (routeLast - routeFirst + 1)
+      local label = routeOpen and s.total > ROUTE_FOLDED and ("[-]" .. (routeMax > 0 and (" " .. L["Stops %d–%d of %d"]:format(routeFirst, routeLast, s.total)) or ""))
+        or hidden > 0 and L["+%d more"]:format(hidden)
+      s.text = (label and (label .. "  ·  ") or "") .. s.title
+      s.rail = routeLast < s.total
+      s.kind = s.total > ROUTE_FOLDED and "routeToggle" or nil
+    end
+  end
+  routeWindow = routeOpen and routeMax and routeMax > 0 and { first = routeFirst, max = routeMax } or nil
+  local visible = {}
+  for _, s in ipairs(specs) do
+    if not (s.step and routeFirst and (s.step < routeFirst or s.step > routeLast)) then visible[#visible + 1] = s end
+  end
+  specs = visible
+  local routeTop, routeBottom
   for i, s in ipairs(specs) do
     local st = STYLE[s.style] or STYLE.item
     local r = getRow(i)
@@ -471,7 +545,7 @@ local function layout(specs)
     if st.icon then
       r.icon:ClearAllPoints()
       r.icon:SetSize(st.icon, st.icon)
-      if s.icon and ICONS[s.icon] then r.icon:SetAtlas(ICONS[s.icon]); r.icon:Show() else r.icon:Hide() end
+      r.icon:SetShown(s.icon and setAtlas(r.icon, ICONS[s.icon]) or false)
       left = st.x + st.icon + 6
     else
       r.icon:Hide()
@@ -479,16 +553,18 @@ local function layout(specs)
 
     local isHero = s.style == "hero"
     local isHeader, isForecast = s.style == "header", s.style == "forecast"
-    local inset = (isHeader or isForecast) and 4 or 2
+    local route = s.style == "routeStop"
+    local inset = route and 10 or (isHeader or isForecast) and 4 or 2 -- route rows leave line between their nodes
     local rightW = (s.right and RIGHT_W + 4 or 0) + (s.progress and BAR_W + 6 or 0) + ((isHero and r.loc) and 40 or 0)
     r.text:SetFontObject(st.font)
+    r.text:SetTextColor(_G[st.font]:GetTextColor())
     r.text:ClearAllPoints()
     r.text:SetPoint("TOPLEFT", left, isHero and -7 or -inset)
     r.text:SetWidth(contentWidth - left - rightW - 4)
-    r.text:SetWordWrap(not compact and (isHero or isForecast or s.style == "note" or s.style == "alert"
-      or s.style=="routeStop" or s.style=="routeStep"))
+    r.text:SetWordWrap(not compact and (isHero or isForecast or s.style == "note" or s.style == "alert"))
     r.text:SetText(s.text)
     local h = r.text:GetStringHeight() + 2 * inset
+    if s.style == "routeMore" then h = h + 4 end -- the plan card's bottom edge
 
     if isHero and s.sub then
       r.sub:ClearAllPoints()
@@ -517,6 +593,37 @@ local function layout(specs)
     if st.icon and r.icon:IsShown() then
       r.icon:SetPoint(isHero and "LEFT" or "TOPLEFT", st.x, isHero and 0 or -((h - st.icon) / 2))
     end
+    -- Route stepper: a line drops from the Next card's icon through one round node per stop. Done stops are
+    -- checked, the current one is solid gold, the rest are numbered; travel is a small hollow ring.
+    local travel = route and not s.num and not s.done
+    r.rail:ClearAllPoints()
+    if route or s.rail then
+      r.rail:SetPoint("TOP", r, "TOPLEFT", NODE_X, 0)
+      r.rail:SetPoint("BOTTOM", r, "TOPLEFT", NODE_X, (route and not s.last) and -h or -h / 2)
+      r.rail:SetColorTexture(GOLD[1], GOLD[2], GOLD[3], s.done and 0.25 or 0.5)
+    end
+    r.rail:SetShown(route or s.rail == true)
+    nodeAt(r.ring, route and (travel and 8 or 16), h, (travel or s.done) and RAIL_DIM or GOLD)
+    nodeAt(r.socket, route and not s.current and (travel and 4 or 13), h, CARD)
+    r.num:SetShown(route and s.num ~= nil and not s.done)
+    if r.num:IsShown() then
+      r.num:SetText(s.num)
+      r.num:ClearAllPoints()
+      r.num:SetPoint("CENTER", r, "TOPLEFT", NODE_X + 0.5, -h / 2)
+      if s.current then r.num:SetTextColor(0.14, 0.1, 0.02) else r.num:SetTextColor(GOLD[1], GOLD[2], GOLD[3]) end
+    end
+    if s.done then
+      r.icon:SetTexture("Interface\\Buttons\\UI-CheckBox-Check")
+      r.icon:SetTexCoord(0, 1, 0, 1)
+      r.icon:ClearAllPoints()
+      r.icon:SetSize(16, 16)
+      r.icon:SetPoint("CENTER", r, "TOPLEFT", NODE_X, -h / 2)
+      r.icon:Show()
+    end
+    if s.done then r.text:SetTextColor(0.55, 0.55, 0.55)
+    elseif s.current then r.text:SetTextColor(GOLD[1], GOLD[2], GOLD[3]) end
+    r.right:ClearAllPoints()
+    r.right:SetPoint("RIGHT", (route and routeWindow) and -8 or -2, 0) -- clear of the route's scrollbar
     if s.right then r.right:SetText(s.right); r.right:Show() else r.right:Hide() end
     if s.progress then
       r.bar:ClearAllPoints()
@@ -527,9 +634,14 @@ local function layout(specs)
       r.bar:Hide()
     end
     r.line:SetShown(isHeader)
-    r.accent:SetShown(isHero or isForecast)
-    r.bg:SetShown(isHero or isForecast or isHeader)
-    if isHero then
+    -- The Next card and its route are one card: same gold edge, a slightly deeper ground under the stops.
+    local plan = route or s.style == "routeMore"
+    r.accent:SetShown(isHero or isForecast or plan)
+    r.bg:SetShown(isHero or isForecast or isHeader or plan)
+    if plan then
+      r.accent:SetColorTexture(1, 0.79, 0.2, 0.95)
+      r.bg:SetColorTexture(CARD[1], CARD[2], CARD[3], 0.88)
+    elseif isHero then
       r.accent:SetColorTexture(1, 0.79, 0.2, 0.95)
       r.bg:SetColorTexture(0.14, 0.11, 0.06, 0.88)
       heroRow = r.loc and r or nil
@@ -559,18 +671,44 @@ local function layout(specs)
     r:SetPoint("TOPLEFT", 0, -y)
     r:SetSize(contentWidth, h)
     r.interactive = s.kind ~= nil or s.questID ~= nil
-    r:EnableMouse(r.interactive)
+    local wheel = routeWindow ~= nil and (route or s.style == "routeMore")
+    r:EnableMouse(r.interactive or wheel)
+    r:EnableMouseWheel(wheel)
     r:SetMouseMotionEnabled(not faded and (r.interactive or r.tip ~= nil or r.forecast ~= nil))
-    if r.interactive then
-      r:SetMouseClickEnabled(not faded)
-    end
+    r:SetMouseClickEnabled(r.interactive and not faded)
     r:Show()
+    if route then routeTop, routeBottom = routeTop or y, y + h end
     y = y + h
   end
   for i = #specs + 1, #rows do rows[i]:Hide() end
+  -- The route's scrollbar: a hairline track down the card's right edge, the thumb where the window is.
+  routeBar:SetShown(routeTop ~= nil and routeWindow ~= nil)
+  if routeBar:IsShown() then
+    local trackH, total = routeBottom - routeTop, routeMax + ROUTE_OPEN
+    routeBar:ClearAllPoints()
+    routeBar:SetPoint("TOPRIGHT", content, "TOPLEFT", contentWidth - 2, -routeTop)
+    routeBar:SetSize(2, trackH)
+    routeThumb:ClearAllPoints()
+    routeThumb:SetPoint("TOP", routeBar, "TOP", 0, -trackH * (routeFirst - 1) / total)
+    routeThumb:SetSize(2, trackH * ROUTE_OPEN / total)
+  end
   content:SetHeight(compact and y or y + 10)
   -- Grow with the content, up to 60% of the screen; scroll after that.
   frame:SetHeight(compact and 90 or math.min(y + 50, UIParent:GetHeight() * 0.6))
+end
+
+-- The wheel over the route moves its window one stop; at either end it scrolls the panel as usual.
+onRouteWheel = function(delta)
+  if routeWindow then
+    local offset = math.max(0, math.min(routeWindow.max, routeWindow.first - 1 - delta))
+    if offset ~= routeWindow.first - 1 then
+      routeOffset = offset
+      GameTooltip_Hide()
+      layout(QT.lastSpecs)
+      return
+    end
+  end
+  scroll:SetVerticalScroll(math.max(0, math.min(scroll:GetVerticalScrollRange(), scroll:GetVerticalScroll() - delta * 20)))
 end
 
 -- The Next card's arrow points where to walk, relative to the way you face.
@@ -836,6 +974,16 @@ function QT.Render()
       plan=previous
     end
   end
+  -- Check off the stops of the last route that game data now shows done; a new level starts a fresh list.
+  local routeDone = QuestTriageCharDB.routeDone
+  if not routeDone or routeDone.level ~= player.level then
+    routeDone = { level = player.level }
+    QuestTriageCharDB.routeDone = routeDone
+  elseif plan and plan ~= QT.activePlan then
+    QT.RecordRouteDone(QT.activePlan, quests, routeDone)
+  end
+  if #routeDone ~= (QT.routeDoneCount or 0) then routeOffset = nil end -- a stop done: back to the current one
+  QT.routeDoneCount = #routeDone
   QT.activePlan = plan
   if plan and plan.gap then
     forecast,ready=QT.QuestForecast(buckets,player,false,plan)
@@ -844,7 +992,7 @@ function QT.Render()
   local specs = QT.BuildRows(buckets, player, power,
     { expanded = QuestTriageDB.expanded, style = QuestTriageDB.opts.style, timedFirst = QuestTriageDB.opts.timedFirst,
       committed = QuestTriageCharDB.committed, death = death, hearth = hearth, fight = QT.ReadTarget(), manaPct = QT.ReadManaPct(),
-      compact = QuestTriageDB.opts.compact, canLevel = canLevel, plan = plan },
+      compact = QuestTriageDB.opts.compact, canLevel = canLevel, plan = plan, routeDone = routeDone },
     pickups and QT.PickupGroups(pickups, player, hidden))
   if QuestTriageDB.opts.compact and specs[1] and specs[1].planned and plan.gap then
     sub:SetText(L["Level %d in ~%d min"]:format(plan.targetLevel or player.level+1,math.ceil(plan.seconds/60)))

@@ -11,7 +11,7 @@ Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn area
 - **One clear next step.** Hand in, pick up, go do, or fix something first, chosen for where you're standing right now.
 - **Live waypoint arrow and travel time** ("~2 min NW"), plus a map pin with a full tooltip.
 - **Objective checklist** on the card: see what's done and what's left at a glance.
-- **Batch or one at a time.** Clear every quest in a hub before you leave and do nearby objectives in one trip, or finish, hand in, then pick up the next.
+- **Three leveling styles.** Power Leveling (default) plans whole trips; Batch clears every quest in a hub before you leave and does nearby objectives in one trip; One at a time finishes, hands in, then picks up the next.
 - **Stays on track.** It sticks with the quest you're doing and finishes what you started instead of jumping around.
 - **Timed quests first.** Need for a Cure and other quests with a timer jump to the top, with the minutes left. Prefer them only near the end, or never? It's a setting.
 
@@ -57,9 +57,9 @@ Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn area
 
 Readable colors (7:1 contrast), every line one row, details on hover, adjustable size and background opacity (see-through text gets a dark outline, so it stays readable over anything), and it fades in combat so it never blocks the fight.
 
-![Quest Triage settings: leveling style Batch (fastest), timed quests first Always, lock panel position, sell gray items automatically, hearthstone tips, open the map when pinning, fade in combat, panel size and background opacity](https://raw.githubusercontent.com/tamuir/QuestTriage/main/docs/images/settings.png)
+![Quest Triage settings: leveling style, timed quests first Always, lock panel position, sell gray items automatically, hearthstone tips, open the map when pinning, fade in combat, panel size and background opacity](https://raw.githubusercontent.com/tamuir/QuestTriage/main/docs/images/settings.png)
 
-*Simple settings in the game's own Options window: Batch or one at a time, when timed quests go first, auto-sell greys, opening the map when you pin, lock, size, background opacity, combat fade.*
+*Simple settings in the game's own Options window: Power Leveling, Batch or one at a time, when timed quests go first, compact panel and its stat, auto-sell greys, opening the map when you pin, lock, size, background opacity, combat fade.*
 
 ## How to use
 

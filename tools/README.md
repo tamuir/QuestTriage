@@ -22,6 +22,7 @@ and other players' names stay out.
 | World map open, mouse over the pin so its tooltip shows | `/qtshots pin-tooltip` |
 | An "Equip …" step on the Next card | `/qtshots gear` |
 | Esc > Options > AddOns > Quest Triage | `/qtshots settings` |
+| Power Leveling on, panel expanded with **+** so the route shows by stop | `/qtshots route` |
 
 A shot keeps one window plus the tooltip over it: Settings, else the world map, else the panel. Retaking a name
 replaces its old record.
@@ -32,6 +33,12 @@ replaces its old record.
 uploads it to GitHub Releases and CurseForge for WoW: Forever. `.github/workflows/release.yml` runs it when a new
 dated section such as `## [0.5.1] - 2026-11-10` is pushed in `CHANGELOG.md`. To see the zip without publishing:
 `DRY_RUN=1 bash tools/release.sh 0.5.0`.
+
+## Power Leveling quest catalog
+
+`RouteCatalog.lua` is generated, don't edit it by hand. Extract the QuestieDB Forever 1.1.3 addon somewhere, then
+run `node tools/build-route-catalog.cjs <path to that folder>`; it rewrites `RouteCatalog.lua` in the repo root. The script refuses any other QuestieDB
+version: review the schema and the provenance notes in `Libs/LICENSES.md` and `docs/power-leveling.md` before changing it.
 
 ## CurseForge description
 

@@ -992,6 +992,25 @@ function QT.BuildRows(buckets, player, power, opts, groups)
     row.checklist = nil
     return rows
   end
+  -- The route hangs off the Next card as a numbered stepper: stops done this level (checked), the current
+  -- one (the card's own stop), then the rest. Every stop is listed (step = its place in the list); the panel
+  -- shows a window of them (QT.RouteWindow) and the footer says which.
+  if nextStep.planned then
+    local stops, title, note = QT.RouteRows(opts.plan, player.level)
+    local done = opts.routeDone or {}
+    if stops[2] or done[1] then
+      for i, d in ipairs(done) do add({ style = "routeStop", done = true, num = i, step = i, text = d.text }) end
+      local n = #done
+      stops[1].current = true
+      for i, s in ipairs(stops) do
+        if s.checks[1] then n = n + 1; s.num = n end -- travel has no number
+        s.step = #done + i
+        add(s)
+      end
+      add({ style = "routeMore", title = title, text = title, total = #done + #stops, doneCount = #done, data = "route",
+        tip = note and { note } or nil })
+    end
+  end
   local fight = opts.fight and QT.FightCheck(opts.fight, { level = player.level, manaPct = opts.manaPct })
   if fight then add({ style = "alert", icon = "blocker", text = fight }) end
   local dur, rep = power.durability, power.repairAt
@@ -1013,10 +1032,6 @@ function QT.BuildRows(buckets, player, power, opts, groups)
       end
       add({ style = "forecast", text = forecast, forecast = details })
     end
-  end
-
-  if nextStep.planned then
-    for _,r in ipairs(QT.RouteRows(opts.plan,player.level)) do add(r) end
   end
 
   local function section(id, label, color, items, limit)

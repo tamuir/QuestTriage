@@ -2,6 +2,14 @@
 
 ## [Unreleased]
 
+- Power Leveling: a new leveling style, now the default. It plans whole trips (pick up, objectives, travel, hand-in) from where you stand, using 970 bundled quests from levels 1–60, so it works with an empty quest log and without Questie. Profiles still on the old Batch default switch once; pick another style in Settings any time.
+- Near the next level it compares ready hand-ins with nearby work that covers the XP gap, and picks the trip that levels you soonest.
+- Travel: boats, zeppelins, the tram, portals, flight paths you know (and ones worth learning), hearthstone and class teleports. Flight times are measured from your own flights.
+- The compact panel shows the next action, time to level and the XP left after the current hand-in. New setting "Compact leveling stat": time to level, XP per hour or quests to level. **+** turns the Next step into a plan card: the route hangs off it as a numbered stepper, one line per stop with the XP it pays. Stops you finish this level get a check (only once the game confirms it), the current one is solid gold, travel is a small ring. Folded it shows the last stop done, the current and the next; the footer gives the time to level and opens ten at a time (mouse wheel scrolls), click again to fold. NPCs, coordinates and every step are in the tooltip.
+- New commands: `/qt power`, `/qt route` (copy the itinerary), `/qt route bands` (zones by level band for your race and faction), `/qt route 21` (preview trips for a level).
+- Party coordination, off by default: `/qt party on` lines up your group on the leader's quest and shared flights. It sends quest IDs, remaining credits and known flight connections to your party only.
+- `/qt stats` adds recent XP per hour, time to level and how fast objective credits come in.
+
 ## [0.5.9] - 2026-11-19
 
 - Closed the panel? Bring it back from the minimap's addon menu (right-click there opens the options), or set a key in Options > Keybindings > AddOns. Closing it now says how.
