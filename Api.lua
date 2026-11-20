@@ -20,7 +20,40 @@ local function questTag(questID)
   return a -- classic: tagID, tagName
 end
 
-local function readClassic()
+-- Only count companions within party range. Someone across the zone cannot help with an elite.
+local function nearbyParty()
+  local party = {}
+  if InCombatLockdown() or IsInRaid() or not UnitInRange then return party end
+  for i = 1, 4 do
+    local unit = "party" .. i
+    local exists = UnitExists(unit)
+    if not issecretvalue(exists) and exists then
+      local inRange, checked = UnitInRange(unit)
+      local connected, dead = UnitIsConnected(unit), UnitIsDeadOrGhost(unit)
+      if not issecretvalue(inRange) and not issecretvalue(checked) and not issecretvalue(connected)
+          and not issecretvalue(dead) and checked and inRange and connected and not dead then
+        table.insert(party, unit)
+      end
+    end
+  end
+  return party
+end
+
+local function sharedWith(party, id, index)
+  local count = 0
+  for _, unit in ipairs(party) do
+    local onQuest
+    if id and C_QuestLog and C_QuestLog.IsUnitOnQuest then
+      onQuest = C_QuestLog.IsUnitOnQuest(unit, id)
+    elseif IsUnitOnQuest then
+      onQuest = IsUnitOnQuest(index, unit)
+    end
+    if not issecretvalue(onQuest) and onQuest then count = count + 1 end
+  end
+  return count
+end
+
+local function readClassic(party)
   local quests, header = {}, nil
   local n = GetNumQuestLogEntries()
   for i = 1, n do
@@ -33,9 +66,16 @@ local function readClassic()
         suggestedGroup = tonumber(suggestedGroup) or 0,
         isComplete = (isComplete == 1 or isComplete == true),
         isFailed = (isComplete == -1),
-        tagID = questTag(questID),
+        shared = sharedWith(party, questID, i),
         objectives = {},
       }
+      q.tagID, q.isElite = questTag(questID)
+      if questID then
+        q.xp = GetQuestLogRewardXP and GetQuestLogRewardXP(questID)
+        q.inArea = not q.isComplete and C_Minimap and C_Minimap.IsInsideQuestBlob and C_Minimap.IsInsideQuestBlob(questID)
+        q.loc = QT.QuestLocation(questID, q.isComplete, q.inArea, header)
+        if not q.isComplete then q.blockers = QT.QuestBlockers(questID) end
+      end
       local numObj = GetNumQuestLeaderBoards(i) or 0
       for j = 1, numObj do
         local text, _, finished = GetQuestLogLeaderBoard(j, i)
@@ -198,7 +238,7 @@ function QT.ScanTrainer()
   QuestTriageCharDB.trainer = { level = level, left = showAvail and left or nil, nextLevel = showUnavail and nextLevel or nil }
 end
 
-local function readModern()
+local function readModern(party)
   local quests, header = {}, nil
   local n = C_QuestLog.GetNumQuestLogEntries()
   for i = 1, n do
@@ -211,6 +251,7 @@ local function readModern()
         local q = {
           title = info.title, level = info.level, questID = id, zone = header,
           suggestedGroup = info.suggestedGroup or 0,
+          shared = sharedWith(party, id, i),
           isComplete = C_QuestLog.IsComplete and C_QuestLog.IsComplete(id) or false,
           isFailed = C_QuestLog.IsFailed and C_QuestLog.IsFailed(id) or false,
           isTrivial = C_QuestLog.IsQuestTrivial and (C_QuestLog.IsQuestTrivial(id) == true),
@@ -248,9 +289,9 @@ end
 
 function QT.ReadQuestLog()
   if GetQuestLogTitle and GetNumQuestLogEntries then
-    return readClassic()
+    return readClassic(nearbyParty())
   elseif C_QuestLog and C_QuestLog.GetInfo then
-    return readModern()
+    return readModern(nearbyParty())
   end
   return {}
 end

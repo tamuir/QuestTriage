@@ -70,6 +70,25 @@ local function withVector(loc)
   return out
 end
 
+function QT.MapLocation(map, x, y, name)
+  if not map or not x or not y then return end
+  local wx, wy, inst = HBD:GetWorldCoordinatesFromZone(x, y, map)
+  if not wx then return end
+  local info = C_Map.GetMapInfo(map)
+  return { uiMapId = map, wx = wx, wy = wy, inst = inst, x = x * 100, y = y * 100,
+    zone = info and info.name, name = name }
+end
+
+function QT.PlayerLocation()
+  local x, y, map = HBD:GetPlayerZonePosition()
+  return QT.MapLocation(map, x, y, GetMinimapZoneText())
+end
+
+function QT.TransportLocation(p)
+  local x,y = HBD:GetZoneCoordinatesFromWorldInstance(p[6],p[7],p[5],p[1])
+  return QT.MapLocation(p[1],x or p[2]/100,y or p[3]/100,p[4])
+end
+
 -- Angle (radians, 0 = north, counter-clockwise) from where you stand to loc, for the live arrow.
 function QT.AngleTo(loc)
   if not (HBD and loc and loc.wx) then return nil end
@@ -377,8 +396,20 @@ end
 -- Quests you can pick up right now (Questie checks level, race, class, prerequisites, professions),
 -- each with where its giver is. Event quests carry .event, and event hand-ins you lack the items for are left out.
 -- Returns a list or nil when the guide is unavailable.
-function QT.ReadPickups()
-  if not load() then return nil end
+function QT.ReadPickups(powerLeveling)
+  if not load() then
+    local map = powerLeveling and C_Map.GetBestMapForUnit("player")
+    if not map or not C_QuestLine then return nil end
+    local offers = {}
+    for _, q in ipairs(C_QuestLine.GetAvailableQuestLines(map) or {}) do
+      if q.isQuestStart and not q.isHidden and not q.inProgress and not C_QuestLog.IsQuestFlaggedCompleted(q.questID)
+          and not C_QuestLog.GetLogIndexForQuestID(q.questID) and not QuestTriageCharDB.notOffered[q.questID] then
+        local loc = QT.MapLocation(map, q.x, q.y, q.questName)
+        if loc then table.insert(offers, { questID = q.questID, title = q.questName, giver = withVector(loc) }) end
+      end
+    end
+    return offers
+  end
   local list = {}
   for questID in pairs(M.AQ.__availableQuests) do
     local ok, quest = pcall(M.DB.GetQuest, questID)
@@ -396,8 +427,47 @@ function QT.ReadPickups()
   return list
 end
 
+-- Questie's log objectives only exist after acceptance. ObjectiveData is its pre-acceptance database.
+-- The native marker of an unfinished quest points at its objective. Use its
+-- actual quest giver at the end of the route even before that marker changes.
+function QT.QuestFinisher(id)
+  if not load() then return end
+  return cached("end:"..id,function()
+    local quest=M.DB.GetQuest(id)
+    if not quest or not quest.Finisher then return end
+    local spawn, area, name=M.DU.GetNearestFinisherOrStarter(quest.Finisher)
+    return spawn, area, name, L["turn-in NPC"]
+  end)
+end
+
+function QT.PickupItinerary(p)
+  if not load() then return end
+  local ok, quest = pcall(M.DB.GetQuest,p.questID)
+  if not ok or not quest then return end
+  p.finish = QT.QuestFinisher(p.questID)
+  p.camps = {}
+  for index, obj in ipairs(quest.ObjectiveData or {}) do
+    local loc = cached("camp:" .. p.questID .. ":" .. index, function()
+      if obj.Type == "item" then return nearestItemSource(obj.Id) end
+      local entity
+      if obj.Type == "monster" then entity = M.DB:GetNPC(obj.Id)
+      elseif obj.Type == "object" then entity = M.DB:GetObject(obj.Id) end
+      if entity and entity.spawns then
+        local spawn, zone = M.DU.GetNearestSpawn(entity.spawns)
+        return spawn, zone, entity.name
+      end
+    end)
+    if not loc then p.camps = nil; return end
+    table.insert(p.camps, loc)
+  end
+  p.xp = GetQuestLogRewardXP and GetQuestLogRewardXP(p.questID)
+end
+
 -- You're talking to npcID, which offers these quests: correct Questie where it was wrong (see QT.MarkOffered).
 function QT.NoteOffered(npcID, offered)
+  for id, q in pairs(QT.RouteQuests) do
+    if q.giver[5] == npcID then QuestTriageCharDB.notOffered[id] = not offered[id] or nil end
+  end
   if not load() then return end
   local starters = {}
   for questID in pairs(M.AQ.__availableQuests) do

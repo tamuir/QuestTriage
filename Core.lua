@@ -3,6 +3,17 @@
 local _, QT = ...
 QT = QT or {}
 
+function QT.InitializeOptions(opts, defaults)
+  -- Batch was stored even when the player had never picked a leveling style.
+  if not opts.powerDefaultApplied then
+    if opts.style=="batch" then opts.style="power" end
+    opts.powerDefaultApplied=true
+  end
+  for key,value in pairs(defaults) do
+    if opts[key]==nil then opts[key]=value end
+  end
+end
+
 -- Translations: the English text is the key, a file in Locales/ (loaded before this one) fills QT.L for its
 -- language, and any text it doesn't translate shows in English.
 local L = setmetatable(QT.L or {}, { __index = function(_, k) return k end })
@@ -101,6 +112,13 @@ local function classifyBase(q, player)
   if isGroupQuest(q) then
     if diff > QT.MAX_LEVELS_ABOVE + 2 then
       return "later", L["Group quest, level %d. Come back at %d with a group."]:format(ql, ql - 2), ql - 2
+    end
+    local title = lower(q.title)
+    local instanceQuest = (GROUP_TAGS[q.tagID] and q.tagID ~= 1)
+      or title:find("%(dungeon%)") or title:find("%(raid%)")
+    if not instanceQuest and diff <= QT.MAX_LEVELS_ABOVE
+        and 1 + (q.shared or 0) >= math.max(2, q.suggestedGroup or 0) then
+      return "now", L["Enough nearby party members have this quest."]
     end
     return "group", L["Dungeon or elite. Look for a group in chat."]
   end
@@ -607,6 +625,19 @@ function QT.BestActions(buckets, power, player, groups, opts)
   end
   local inside = {} -- quests whose game-drawn area you're standing in
 
+  -- Normalize against the character's own log so starter and high-level rewards use the same scale.
+  local rewardSum, rewardCount = 0, 0
+  for _, id in ipairs({ "now", "turnin" }) do
+    for _, e in ipairs(buckets[id]) do
+      local xp = e.quest.xp
+      if xp and xp > 0 then rewardSum, rewardCount = rewardSum + xp, rewardCount + 1 end
+    end
+  end
+  local function rewardWeight(q)
+    if not batch or not q.xp or q.xp <= 0 then return 1 end
+    return math.max(0.5, math.min(2, q.xp / (rewardSum / rewardCount)))
+  end
+
   -- A running timer beats every distance: timed quests come first, the soonest to run out first.
   local timed = {}
   for _, id in ipairs({ "turnin", "now" }) do
@@ -642,7 +673,7 @@ function QT.BestActions(buckets, power, player, groups, opts)
     local q = e.quest
     local w = batch and (near(q.loc) and 0.3 or 1.0) or 0.6
     if near(q.loc) then hereCount = hereCount + 1 end
-    step(yards(q.loc) * w + i, { icon = "turnin", text = L["Hand in %s"]:format(q.title), kind = "quest", data = q.questID,
+    step(yards(q.loc) * w / rewardWeight(q) + i, { icon = "turnin", text = L["Hand in %s"]:format(q.title), kind = "quest", data = q.questID,
       questID = q.questID, key = "end:" .. tostring(q.questID), loc = q.loc, xp = q.xp, sub = q.loc and q.loc.name and L["to %s"]:format(q.loc.name) or nil })
   end
   -- One at a time: no new quests while you still have one to finish.
@@ -690,6 +721,31 @@ function QT.BestActions(buckets, power, player, groups, opts)
       -- Momentum: a quest you've started costs less, so you finish it before starting fresh ones.
       local cost = (batch and yards(q.loc) / (1 + n) or yards(q.loc)) * (1 - (batch and 0.6 or 0.7) * p)
       local sub = (not q.loc and q.zone) or nil -- objectives show as a checklist on the card
+      if batch and q.loc and q.loc.yards then
+        local remaining = 0
+        for _, o in ipairs(q.objectives or {}) do
+          remaining = remaining + math.max(0, (o.need or 0) - (o.have or 0))
+        end
+        -- Six remaining credits are neutral. Bound the estimate because individual drops vary.
+        local effort = remaining > 0 and (0.7 + 0.05 * math.min(remaining, 20)) or 1
+        cost = cost * effort / rewardWeight(q)
+        cost = cost / (1 + 0.35 * (q.shared or 0))
+        -- Price a second stop when a completed quest can be handed in near the objective.
+        local follow, tripCost
+        for _, completed in ipairs(buckets.turnin) do
+          local handin = completed.quest
+          local detour = between(q.loc, handin.loc)
+          if detour and detour <= QT.CLUSTER_RADIUS then
+            local combined = (cost + detour) / (1 + 0.5 * rewardWeight(handin))
+            if combined < (tripCost or cost) then follow, tripCost = handin, combined end
+          end
+        end
+        if follow then
+          cost = tripCost
+          table.insert(obj, L["Then hand in %s nearby."]:format(follow.title))
+        end
+      end
+      if (q.shared or 0) > 0 then sub = L["Nearby allies on quest: %d"]:format(q.shared) end
       if n > 0 then
         sub = (sub and (sub .. " · ") or "") .. (n <= 2 and L["same trip: %s"]:format(table.concat(names, ", "))
           or L["%d more quests nearby"]:format(n))
@@ -711,13 +767,14 @@ function QT.BestActions(buckets, power, player, groups, opts)
       table.insert(idList, tostring(q.questID))
       table.insert(parts, #inside == 1 and "" or (q.title .. (obj[1] and (" (" .. obj[1] .. ")") or "")))
       table.insert(tip, q.title .. ((#obj > 0) and (": " .. table.concat(obj, ", ")) or ""))
+      if q.pace then table.insert(tip, q.pace) end
       xp, lvl = xp + (q.xp or 0), math.max(lvl, q.level or 0)
     end
     table.sort(idList)
     local detail = table.concat(parts, " · ")
     step(0.01, { icon = "objective", here = true, loc = first.loc, xp = xp, qlevel = lvl, tip = tip,
       text = #inside == 1 and L["Do %s here"]:format(first.title) or L["Do %d quests here"]:format(#inside),
-      sub = L["You're in the area"] .. (detail ~= "" and (" · " .. detail) or ""),
+      sub = (#inside == 1 and first.pace or L["You're in the area"]) .. (detail ~= "" and (" · " .. detail) or ""),
       kind = "quest", data = first.questID, questID = first.questID, questIDs = ids, checklist = #inside == 1 and QT.Checklist(first) or nil,
       key = #inside == 1 and ("do:" .. tostring(first.questID)) or ("area:" .. table.concat(idList, ",")) })
   end
@@ -725,8 +782,17 @@ function QT.BestActions(buckets, power, player, groups, opts)
 
   -- In batch mode, say how much is left to grab here before moving on.
   local first = route[1]
-  if batch and first and near(first.loc) and hereCount > 1 then
+  if opts.plan and (not first or first.cost >= 0) then
+    local planned = QT.PowerAction(opts.plan, player)
+    if opts.plan.gap and not opts.death then table.insert(acts,1,planned) else add(planned) end
+  end
+  if batch and first and (first.icon == "pickup" or first.icon == "turnin") and near(first.loc) and hereCount > 1 then
     first.sub = (first.sub and (first.sub .. " · ") or "") .. L["%d more to do here"]:format(hereCount - 1)
+    first.tip = first.tip or {}
+    for i = 2, #route do
+      local a = route[i]
+      if (a.icon == "pickup" or a.icon == "turnin") and near(a.loc) then table.insert(first.tip, a.text) end
+    end
   end
   for _, a in ipairs(route) do add(a) end
   if #acts == 0 then
@@ -741,16 +807,86 @@ function QT.BestActions(buckets, power, player, groups, opts)
   return acts, reminders
 end
 
--- How far your current quests take you. player: { xp, xpMax }. Returns nil when the game gave no XP data.
-function QT.XPSummary(buckets, player)
-  local total = 0
-  for _, id in ipairs({ "turnin", "now" }) do
-    for _, e in ipairs(buckets[id]) do total = total + (e.quest.xp or 0) end
+-- Count known rewards, ready first and largest first within each bucket.
+function QT.QuestForecast(buckets, player, withDetails, plan)
+  local gap = (player.xpMax or 0) - (player.xp or 0)
+  if gap <= 0 then return end
+  local count, ready = 0, 0
+  local details = withDetails and { level = player.level + 1, needed = gap, earned = player.xp or 0, cap = player.xpMax,
+    turnin = { xp = 0 }, now = { xp = 0 } } or nil
+  if plan and plan.gap==gap then
+    local byId={}
+    for _,job in ipairs(plan.jobs) do byId[job.id]=job end
+    for _,s in ipairs(plan.steps) do
+      local job=byId[s.questID]
+      if s.icon=="turnin" and job then
+        count=count+1
+        local done=job.steps[1].icon=="turnin"
+        if done then ready=ready+1 end
+        if details then
+          local group=done and details.turnin or details.now
+          group.xp=group.xp+job.xp
+          table.insert(group,{title=job.title or s.text,xp=job.xp})
+        end
+      end
+    end
+    if ready==count then return L["Level %d · hand in %d ready"]:format(player.level+1,ready),true,details end
+    if ready==0 then return L["Level %d · finish and hand in %d"]:format(player.level+1,count),false,details end
+    return L["Level %d · hand in %d ready + finish %d"]:format(player.level+1,ready,count-ready),false,details
   end
-  if total == 0 or not player.xpMax or player.xpMax == 0 then return nil end
-  local need = player.xpMax - (player.xp or 0)
-  if total >= need then return L["Your quests are enough to level up."] end
-  return L["Your quests cover %d%% of this level."]:format(math.floor(total / need * 100))
+  for _, bucket in ipairs({ "turnin", "now" }) do
+    local rewards = {}
+    for _, e in ipairs(buckets[bucket]) do
+      if (e.quest.xp or 0) > 0 then table.insert(rewards, e.quest) end
+    end
+    table.sort(rewards, function(a, b)
+      if a.xp ~= b.xp then return a.xp > b.xp end
+      return (a.title or "") < (b.title or "")
+    end)
+    for _, q in ipairs(rewards) do
+      count, gap = count + 1, gap - q.xp
+      if details then
+        local group = details[bucket]
+        group.xp = group.xp + q.xp
+        table.insert(group, q)
+      end
+      if bucket == "turnin" then ready = ready + 1 end
+      if gap <= 0 then
+        if count == ready then return L["Level %d · hand in %d ready"]:format(player.level + 1, ready), true, details end
+        if ready == 0 then return L["Level %d · finish and hand in %d"]:format(player.level + 1, count), false, details end
+        return L["Level %d · hand in %d ready + finish %d"]:format(player.level + 1, ready, count - ready), false, details
+      end
+    end
+  end
+  if count == 0 then return L["%s XP to level %d"]:format(commas(gap), player.level + 1), false, details end
+  return L["After quest rewards: %s XP to level %d"]:format(commas(gap), player.level + 1), false, details
+end
+
+-- Sample the player's XP bar, including combat and exploration. Keep ten minutes of minute samples.
+function QT.UpdatePace(s, level, xp, cap, now)
+  if not cap or cap <= 0 or not xp or xp > cap or xp < 0 then return end
+  if not s.level or level < s.level or level > s.level + 1 then
+    s.start, s.total, s.samples = now, 0, {}
+  elseif level == s.level then
+    if xp < s.xp then return end -- the XP bar can roll over before UnitLevel updates
+    s.total = s.total + xp - s.xp
+  else
+    s.total = s.total + s.cap - s.xp + xp
+  end
+  s.level, s.xp, s.cap = level, xp, cap
+  local samples = s.samples
+  while #samples > 1 and samples[2].at <= now - 600 do table.remove(samples, 1) end
+  if not samples[1] or now - samples[#samples].at >= 60 then
+    table.insert(samples, { at = now, total = s.total })
+  end
+end
+
+function QT.LevelPace(s, now)
+  if not s.start or now - s.start < 120 then return end
+  local sample = s.samples[1]
+  local rate = (s.total - sample.total) * 3600 / math.max(1, now - sample.at)
+  local average = s.total * 3600 / (now - s.start)
+  return rate, average, rate > 0 and math.ceil((s.cap - s.xp) * 60 / rate) or nil
 end
 
 -- Short tag after a quest name, only when it matters.
@@ -834,17 +970,27 @@ function QT.BuildRows(buckets, player, power, opts, groups)
       table.insert(meta, #prep > 0 and L["Hard (+%d): %s first, start at full health"]:format(over, table.concat(prep, L[" and "]))
         or L["Hard (+%d): start at full health"]:format(over))
     end
-    if a.sub then table.insert(meta, a.sub) end
+    if a.stepDetail then table.insert(meta, a.stepDetail)
+    elseif a.sub then table.insert(meta, a.sub) end
     -- Inside a quest area the location is the nearest spawn of what you need, so point at it.
     local where = a.here and a.loc and a.loc.yards and (a.loc.yards <= 25 and L["one right next to you"] or L["nearest %s"]:format(QT.Short(a.loc))) or (not a.here and QT.Where(a.loc, player)) or nil
     if where then table.insert(meta, where) end
     local need = player.xpMax and player.xpMax > 0 and (player.xpMax - (player.xp or 0))
     if a.xp and a.xp > 0 and need and need > 0 then
-      table.insert(meta, L["+%d%% of level"]:format(math.max(1, math.floor(a.xp / need * 100 + 0.5))))
+      table.insert(meta, L["+%d%% of level"]:format(math.floor(a.xp / player.xpMax * 100 + 0.5)))
     end
-    add({ style = "hero", icon = a.icon, text = a.text, sub = #meta > 0 and table.concat(meta, "  ·  ") or nil,
+    add({ style = "hero", planned = a.planned, icon = a.icon, text = a.text, sub = #meta > 0 and table.concat(meta, "  ·  ") or nil,
       kind = a.kind, data = a.data, loc = a.loc, tip = a.tip, questID = a.questID, key = a.key, pinQuestID = a.pinQuestID, thenLoc = a.thenLoc, thenTitle = a.thenTitle, checklist = a.checklist,
       yards = a.loc and a.loc.yards, here = a.here, qlevel = a.qlevel, skips = a.skips })
+  end
+  if opts.compact then
+    local row = rows[1]
+    row.tip = row.tip or {}
+    local short = nextStep.stepDetail or nextStep.sub or QT.Where(nextStep.loc, player)
+    if row.sub and row.sub~=short then table.insert(row.tip, 1, row.sub) end
+    row.sub = short
+    row.checklist = nil
+    return rows
   end
   local fight = opts.fight and QT.FightCheck(opts.fight, { level = player.level, manaPct = opts.manaPct })
   if fight then add({ style = "alert", icon = "blocker", text = fight }) end
@@ -856,9 +1002,22 @@ function QT.BuildRows(buckets, player, power, opts, groups)
   end
   if opts.hearth then add(opts.hearth) end
   if #reminders > 0 then add({ style = "note", text = L["Also: %s"]:format(table.concat(reminders, " · ")) }) end
-  local xp = QT.XPSummary(buckets, player)
-  if xp then add({ style = "note", text = xp }) end
-  if opts.compact then return rows end -- compact panel: the Next step and its notes, no lists
+  if opts.canLevel ~= false then
+    local forecast, _, details = QT.QuestForecast(buckets, player, true, opts.plan)
+    if forecast then
+      local left = details.needed - details.turnin.xp
+      local ready = #details.turnin
+      if ready > 0 and left > 0 and not (opts.plan and opts.plan.gap) then
+        local label = ready == 1 and L["After %d hand-in: %s XP to level %d"] or L["After %d hand-ins: %s XP to level %d"]
+        forecast = label:format(ready, commas(left), details.level)
+      end
+      add({ style = "forecast", text = forecast, forecast = details })
+    end
+  end
+
+  if nextStep.planned then
+    for _,r in ipairs(QT.RouteRows(opts.plan,player.level)) do add(r) end
+  end
 
   local function section(id, label, color, items, limit)
     if #items == 0 then return end

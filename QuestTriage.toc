@@ -22,4 +22,9 @@ Locales\deDE.lua
 Core.lua
 Api.lua
 Guide.lua
+RouteCatalog.lua
+TravelCatalog.lua
+Planner.lua
+Travel.lua
+Party.lua
 UI.lua

@@ -10,6 +10,8 @@ Works with **Questie**: nearby quest givers, turn-in NPCs and monster spawn area
 
 ## Leveling guide that adapts to you
 
+**Power Leveling** starts automatically and compares trips from your current position. It includes 970 quests from levels 1–60 and can start with an empty log. Near the next level it compares ready hand-ins with nearby work that covers the XP gap. The compact panel shows your next action, estimated time to level and the XP left after the current hand-in. Expand it with **+** to see the full route, including NPCs, coordinates, travel and rewards. It updates as you move, earn XP and finish quests.
+
 - **One clear next step.** Hand in, pick up, go do, or fix something first, chosen for where you're standing right now.
 - **Live waypoint arrow and travel time** ("~2 min NW"), plus a map pin with a full tooltip.
 - **Objective checklist** on the card: see what's done and what's left at a glance.
@@ -71,7 +73,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 - **Shift-click a quest:** link it in chat.
 - **Right-click a line:** show on map, open in quest log, share with party, save for later (until a level you pick, or until you bring it back), hide, skip a quest to pick up, abandon (Drop list), try again.
 - **Click an Equip step:** puts the item on.
-- **The - button** folds the panel to just the Next card; **+** brings the lists back.
+- **+** shows the route and quest lists. **−** folds the panel to the Next card.
 - **Closed it?** Bring it back from the minimap's addon menu (right-click there for the settings), with `/qt`, or with a key.
 - **Keys** (Options > Keybindings > AddOns): show or hide the panel, and go to the next step (same as clicking the card).
 - **At the reward window** it names the choice that's a clear upgrade for you, in chat. The pick stays yours.
@@ -80,6 +82,11 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 | --- | --- |
 | `/qt` | Show or hide the panel |
 | `/qt options` | Open the settings |
+| `/qt power` | Enable Power Leveling |
+| `/qt route` | Show each stop, its quest rewards and the XP left to level |
+| `/qt route bands` | Browse catalog zones for your race and faction by level band |
+| `/qt route 21` | Preview up to three trips for that level from your current position |
+| `/qt party on` or `/qt party off` | Toggle party route coordination on this character |
 | `/qt stats` | Your leveling stats |
 | `/qt unhide` | Bring back hidden and skipped quests and items |
 | `/qt reset` | Move the panel back to its starting spot |
@@ -88,7 +95,7 @@ The panel opens on login. Everything is in the Next card and the lists; hover an
 ## FAQ
 
 **Does it work without Questie?**
-Yes. It still sorts your quest log, points the arrow at Blizzard's own quest markers (hand-ins too), and checks gear, trainers, deaths and quest areas. Nearby pick-ups, turn-in NPC names, missing items and spawn areas need [Questie](https://www.curseforge.com/wow/addons/questie).
+Yes. The bundled catalog supplies pickups, objectives and hand-ins. The game supplies your quest log and its map markers. Questie adds offer checks, more quests, item sources and spawn areas. [Questie on CurseForge](https://www.curseforge.com/wow/addons/questie)
 
 **Which languages?**
 English and German. Anything not translated yet shows in English.
@@ -97,17 +104,17 @@ English and German. Anything not translated yet shows in English.
 WoW: Forever. Other versions aren't tested yet.
 
 **Is it a step-by-step leveling route?**
-No fixed route. It works out the best next step from your own quest log and position, so it fits however you play.
+Power Leveling plans trips from your position, quest progress and available travel. It checks the next objective and hand-in as well as the pickup. Learn a suggested flight path by speaking to the flight master. The planner can use that flight once the game confirms the connection and fare.
 
 **Does it collect any data?**
-No. Everything stays in your own SavedVariables; nothing is sent anywhere.
+Leveling history and flight measurements stay in your character's SavedVariables. If you enable party coordination, the addon sends your current quest ID, remaining credits and affordable flight connections to your party through the game's addon channel.
 
 **Where do I report bugs?**
 On GitHub: https://github.com/tamuir/QuestTriage/issues. Type `/qt debug`: a window opens with the details already selected. Press Ctrl+C and paste them into your report; that helps a lot.
 
 ## Credits
 
-Where to do your quests comes from the game's own quest markers whenever it has them. Quests to pick up, turn-in NPCs, missing items and hunting spots come from [Questie](https://github.com/Questie/Questie) and QuestieDB, read at runtime from your own install; Quest Triage contains none of their code or data. Map pins and distances use [HereBeDragons](https://github.com/Nevcairiel/HereBeDragons) by Nevcairiel (BSD), bundled unmodified with LibStub and CallbackHandler from Ace3 (see [Libs/LICENSES.md](Libs/LICENSES.md)). Thank you to the Questie team and contributors, to Nevcairiel and to the Ace3 team. Open source under [GPL-3.0](LICENSE.md).
+The planner uses Forever quest facts from QuestieDB, travel facts from Polestar and its upstream contributors, and native game observations. Map pins and coordinate conversion use HereBeDragons by Nevcairiel with LibStub and CallbackHandler from Ace3. [Resource review](docs/power-leveling.md) · [Bundled credits](Libs/LICENSES.md) · [GPL-3.0](LICENSE.md)
 
 ## Development
 

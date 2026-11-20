@@ -175,11 +175,11 @@ assert(yRow.progress == 0.25 and not yRow.text:find("3/12"))
 
 -- Next card shows what the step is worth.
 local xpRows = QT.BuildRows(QT.Triage({ q{ title = "Big", level = 12, questID = 1, xp = 400, loc = at(10, 0) } }, player), player, {}, {})
-assert(xpRows[1].sub:find("%+10%% of level"), xpRows[1].sub)
+assert(xpRows[1].sub:find("%+8%% of level"), xpRows[1].sub)
 
 -- XP summary and stats.
-assert(QT.XPSummary(QT.Triage({ q{ title = "Z", level = 12, xp = 2000 } }, player), player) == "Your quests cover 50% of this level.")
-assert(QT.XPSummary(QT.Triage({}, player), player) == nil)
+assert(QT.QuestForecast(QT.Triage({ q{ title = "Z", level = 12, xp = 2000 } }, player), player) == "After quest rewards: 2,000 XP to level 13")
+assert(QT.QuestForecast(QT.Triage({}, player), player) == "4,000 XP to level 13")
 assert(QT.Commas(1234567) == "1,234,567" and QT.Commas(999) == "999")
 
 -- Death: everything waits until you're back at your corpse.
@@ -580,7 +580,7 @@ do
   assert(loadfile("Locales/deDE.lua"))("QuestTriage", ns)
   _G.GetLocale = nil
   local used = { Innkeeper = true, Repair = true } -- looked up by Questie's townsfolk kind (Guide.lua: L[kind])
-  for _, f in ipairs({ "Core.lua", "Api.lua", "Guide.lua", "UI.lua" }) do
+  for _, f in ipairs({ "Core.lua", "Api.lua", "Guide.lua", "UI.lua", "Party.lua", "Planner.lua", "Travel.lua" }) do
     local fh = assert(io.open(f))
     local src = fh:read("*a")
     fh:close()
@@ -604,4 +604,81 @@ do
   _G.QuestTriage = QT -- loading Core again replaced it
 end
 
+do
+  local a = q{ title = "Elite", level = 12, suggestedGroup = 3, shared = 1 }
+  assert(QT.Classify(a, player) == "group")
+  a.shared = 2
+  assert(QT.Classify(a, player) == "now")
+  a.tagID = 81
+  assert(QT.Classify(a, player) == "group")
+  local near = q{ title = "Near", questID = 1, loc = at(0, 450), xp = 900 }
+  local far = q{ title = "Far", questID = 2, loc = at(800, 0), xp = 1900 }
+  local function nextID() return QT.BestActions(QT.Triage({ near, far }, player), {}, player)[1].questID end
+  assert(nextID() == 2)
+  far.xp = 900
+  assert(nextID() == 1)
+  far.shared = 3
+  assert(nextID() == 2)
+  near.isComplete, near.xp, far.xp = true, 3000, 1000
+  local buckets = QT.Triage({ near, far }, player)
+  local row = has(QT.BuildRows(buckets, player, {}, {}), "After 1 hand%-in: 1,000 XP to level 13")
+  assert(row and row.forecast.earned == player.xp and row.forecast.cap == player.xpMax)
+  assert(row and row.forecast.needed == 4000 and row.forecast.level == 13)
+  assert(row.forecast.turnin.xp == 3000 and row.forecast.turnin[1].title == "Near")
+  assert(row.forecast.now.xp == 1000 and row.forecast.now[1].title == "Far")
+  far.xp = nil
+  assert(QT.QuestForecast(buckets, player) == "After quest rewards: 1,000 XP to level 13")
+  near.xp = 4000
+  assert(select(2, QT.QuestForecast(buckets, player)) == true)
+  assert(#QT.BuildRows(buckets, player, { freeSlots = 1 }, { compact = true }) == 1)
+  local s = {}
+  QT.UpdatePace(s, 12, 4900, 5000, 10)
+  QT.UpdatePace(s, 12, 50, 5000, 11)
+  QT.UpdatePace(s, 13, 50, 6000, 70)
+  assert(QT.LevelPace(s, 70) == nil)
+  QT.UpdatePace(s, 13, 100, 6000, 130)
+  local recent, average, eta = QT.LevelPace(s, 130)
+  assert(s.total == 200 and recent == 6000 and average == 6000 and eta == 59)
+end
+
+-- Exercise the actual Forever reader. A protected or unchecked range must never promote an elite.
+do
+  local secret, combat, raid, checks = {}, false, false, 0
+  local function noop() end
+  local ns = { QuestBlockers = noop, QuestLocation = noop }
+  local client = setmetatable({
+    InCombatLockdown = function() return combat end,
+    IsInRaid = function() return raid end,
+    UnitExists = function() return true end,
+    UnitIsConnected = function() return true end,
+    UnitIsDeadOrGhost = function(unit) return unit == "party4" end,
+    UnitInRange = function(unit)
+      if unit == "party2" then return secret, true end
+      return true, unit ~= "party3"
+    end,
+    issecretvalue = function(value) return value == secret end,
+    GetQuestLogRewardXP = function(id) assert(id == 72); return 900 end,
+    C_QuestLog = {
+      GetNumQuestLogEntries = function() return 1 end,
+      GetInfo = function() return { questID = 72, title = "Elite", level = 12, suggestedGroup = 2 } end,
+      GetTimeAllowed = noop,
+      IsUnitOnQuest = function(unit, id)
+        assert(unit == "party1" and id == 72)
+        checks = checks + 1
+        return true
+      end,
+    },
+  }, { __index = _G })
+  local reader = assert(loadfile("Api.lua"))
+  setfenv(reader, client)
+  reader("QuestTriage", ns)
+  local quest = ns.ReadQuestLog()[1]
+  assert(quest.shared == 1 and quest.xp == 900 and QT.Classify(quest, player) == "now")
+  combat = true
+  assert(ns.ReadQuestLog()[1].shared == 0)
+  combat, raid = false, true
+  assert(ns.ReadQuestLog()[1].shared == 0 and checks == 1)
+end
+
+assert(loadfile("tests/power.lua"))(QT)
 print("all tests passed")

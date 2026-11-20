@@ -22,7 +22,7 @@ end
 local FONTS = { metaFont, ownFont("QuestTriageFontHero", GameFontNormalMed3),
   ownFont("QuestTriageFontHeader", GameFontNormal), ownFont("QuestTriageFontItem", GameFontHighlightSmall) }
 
-local DEFAULTS = { style = "batch", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true, openMap = true, timedFirst = 0, bgAlpha = QT.PANEL_BG[4], compact = false }
+local DEFAULTS = { style = "power", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true, openMap = true, timedFirst = 0, bgAlpha = QT.PANEL_BG[4], compact = true, stat = "eta" }
 
 local frame = CreateFrame("Frame", "QuestTriageFrame", UIParent,
   BackdropTemplateMixin and "BackdropTemplate" or nil)
@@ -53,9 +53,9 @@ frame:SetScript("OnDragStop", function(self)
 end)
 if frame.SetBackdrop then
   frame:SetBackdrop({
-    bgFile = "Interface\\Tooltips\\UI-Tooltip-Background",
+    bgFile = "Interface\\Buttons\\WHITE8X8",
     edgeFile = "Interface\\Tooltips\\UI-Tooltip-Border",
-    tile = true, tileSize = 16, edgeSize = 16,
+    tile = false, edgeSize = 16,
     insets = { left = 4, right = 4, top = 4, bottom = 4 },
   })
   frame:SetBackdropColor(unpack(QT.PANEL_BG))
@@ -95,6 +95,7 @@ gear:SetNormalAtlas("QuestLog-icon-setting")
 gear:SetHighlightAtlas("QuestLog-icon-setting", "ADD")
 gear:SetScript("OnClick", function() QT.OpenOptions() end)
 gear:SetScript("OnEnter", function(self)
+  if InCombatLockdown() then return end
   GameTooltip:SetOwner(self, "ANCHOR_LEFT")
   GameTooltip:SetText(L["Options"], 1, 1, 1)
   GameTooltip:AddLine(L["Leveling style, timed quests, tips, size and more."], 0.8, 0.8, 0.8, true)
@@ -126,22 +127,26 @@ compactBtn:SetScript("OnClick", function()
   end
 end)
 compactBtn:SetScript("OnEnter", function(self)
+  if InCombatLockdown() then return end
   GameTooltip:SetOwner(self, "ANCHOR_LEFT")
-  GameTooltip:SetText(QuestTriageDB.opts.compact and L["Show the lists"] or L["Compact: only the Next step"], 1, 1, 1)
+  GameTooltip:SetText(QuestTriageDB.opts.compact and L["Show the route and quest lists"] or L["Compact: only the Next step"], 1, 1, 1)
   GameTooltip:Show()
 end)
 compactBtn:SetScript("OnLeave", GameTooltip_Hide)
 
 -- This session's results, shown in the help tooltip. Resets on every login or /reload.
-local session = { start = time(), done = 0, xp = 0 }
+local session = { done = 0 }
+local pace, levelStats = {}, {}
 
 help:SetScript("OnEnter", function(self)
+  if InCombatLockdown() then return end
   GameTooltip:SetOwner(self, "ANCHOR_LEFT")
   GameTooltip:SetText("Quest Triage", 1, 0.82, 0)
   GameTooltip:AddLine(L["Click a line: map pin and open the map"], 1, 1, 1)
   GameTooltip:AddLine(L["Shift-click: link the quest in chat"], 1, 1, 1)
   GameTooltip:AddLine(L["Right-click: more (hide, abandon, quest log)"], 1, 1, 1)
   GameTooltip:AddLine(" ")
+  for _, line in ipairs(levelStats) do GameTooltip:AddLine(line, 1, 1, 1) end
   GameTooltip:AddDoubleLine("/qt", L["show or hide"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt options", L["settings"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
   GameTooltip:AddDoubleLine("/qt stats", L["how you're doing"], 0.4, 1, 0.4, 0.8, 0.8, 0.8)
@@ -151,10 +156,8 @@ help:SetScript("OnEnter", function(self)
   GameTooltip:AddLine(L["The - button folds the panel to just the Next step."], 0.8, 0.8, 0.8, true)
   GameTooltip:AddLine(L["Closed it? Bring it back from the minimap's addon menu, /qt, or a key (Options > Keybindings > AddOns)."], 0.8, 0.8, 0.8, true)
   if session.done > 0 then
-    local hours = (time() - session.start) / 3600
     GameTooltip:AddLine(" ")
-    GameTooltip:AddLine(L["This session: %d quests, %s XP"]:format(session.done, QT.Commas(session.xp))
-      .. (hours > 0.08 and (" " .. L["(%s/hour)"]:format(QT.Commas(session.xp / hours))) or ""), 0.8, 0.8, 0.8)
+    GameTooltip:AddLine(L["This session: %d quests, %s XP"]:format(session.done, QT.Commas(pace.total or 0)), 0.8, 0.8, 0.8)
   end
   GameTooltip:Show()
 end)
@@ -302,8 +305,46 @@ local HINTS = {
 }
 
 -- Details live here, not in the panel: objectives, reason, exact location, XP, then what clicks do.
+local hoveredForecast
+local function showForecast(row)
+  local f = row.forecast
+  local expanded = IsShiftKeyDown()
+  row.forecastExpanded = expanded
+  GameTooltip:SetText(L["Level %d"]:format(f.level), 1, 0.82, 0)
+  GameTooltip:AddDoubleLine(L["XP needed"], QT.Commas(f.needed), 1, 1, 1, 1, 1, 1)
+  for _, id in ipairs({ "turnin", "now" }) do
+    local group = f[id]
+    if #group > 0 then
+      local label = id == "turnin" and L["Ready to hand in (%d)"] or L["Still to finish (%d)"]
+      GameTooltip:AddLine(" ")
+      GameTooltip:AddDoubleLine(label:format(#group), L["%s XP"]:format(QT.Commas(group.xp)),
+        0.8, 0.87, 1, 0.8, 0.87, 1)
+      local visible = expanded and #group or (id == "now" and math.min(2, #group) or 0)
+      for i = 1, visible do
+        local q = group[i]
+        GameTooltip:AddDoubleLine("  " .. q.title, QT.Commas(q.xp), 0.9, 0.9, 0.9, 0.8, 0.8, 0.8)
+      end
+    end
+  end
+  local shortfall = f.needed - f.turnin.xp - f.now.xp
+  if shortfall > 0 and shortfall < f.needed then
+    GameTooltip:AddDoubleLine(L["XP still needed"], QT.Commas(shortfall), 1, 0.82, 0.55, 1, 0.82, 0.55)
+  end
+  if not expanded and (#f.turnin > 0 or #f.now > 2) then
+    GameTooltip:AddLine(" ")
+    GameTooltip:AddLine(L["Hold Shift for quest names"], 0.75, 0.75, 0.75)
+  end
+  GameTooltip:Show()
+end
+
 local function onRowEnter(row)
+  if InCombatLockdown() then return end
   GameTooltip:SetOwner(row, "ANCHOR_LEFT")
+  if row.forecast then
+    hoveredForecast = row
+    showForecast(row)
+    return
+  end
   if row.kind == "equip" or row.kind == "bags" then
     GameTooltip:SetHyperlink(row.data)
   else
@@ -311,6 +352,9 @@ local function onRowEnter(row)
     if row.sub:IsShown() then GameTooltip:AddLine(row.sub:GetText(), 0.8, 0.8, 0.8, true) end
     for _, line in ipairs(row.tip or {}) do GameTooltip:AddLine(line, 0.8, 0.8, 0.8, true) end
     if row.yards then GameTooltip:AddLine(L["%s yd away"]:format(QT.Commas(row.yards)), 0.78, 0.78, 0.78) end
+  end
+  if row.questID and row.kind == "quest" and IsInGroup() and GameTooltip.SetQuestPartyProgress then
+    GameTooltip:SetQuestPartyProgress(row.questID, true, true)
   end
   local hint = HINTS[(row.kind == "quest" and row.loc) and "questLoc" or row.kind]
   if hint then GameTooltip:AddLine(hint, 0.4, 1, 0.4, true) end
@@ -326,11 +370,16 @@ local function getRow(i)
   r = CreateFrame("Button", nil, content)
   r:RegisterForClicks("LeftButtonUp", "RightButtonUp")
   r.bg = r:CreateTexture(nil, "BACKGROUND")
+  r.bg:SetAllPoints()
+  r.accent = r:CreateTexture(nil, "BORDER")
+  r.accent:SetWidth(2)
+  r.accent:SetPoint("TOPLEFT")
+  r.accent:SetPoint("BOTTOMLEFT")
   r.line = r:CreateTexture(nil, "BORDER")
   r.line:SetHeight(1)
   r.line:SetPoint("TOPLEFT", 0, 0)
   r.line:SetPoint("TOPRIGHT", 0, 0)
-  r.line:SetColorTexture(1, 1, 1, 0.12)
+  r.line:SetColorTexture(0.72, 0.68, 0.57, 0.45)
   r.icon = r:CreateTexture(nil, "ARTWORK")
   r.arrow = r:CreateTexture(nil, "ARTWORK")
   r.arrow:SetAtlas("UI-HUD-Minimap-Arrow-Player")
@@ -359,7 +408,10 @@ local function getRow(i)
   r:SetHighlightTexture("Interface\\QuestFrame\\UI-QuestTitleHighlight", "ADD")
   r:SetScript("OnClick", onRowClick)
   r:SetScript("OnEnter", onRowEnter)
-  r:SetScript("OnLeave", GameTooltip_Hide)
+  r:SetScript("OnLeave", function(self)
+    if hoveredForecast == self then hoveredForecast = nil end
+    GameTooltip_Hide()
+  end)
   rows[i] = r
   return r
 end
@@ -367,25 +419,50 @@ end
 -- Per style: font, icon size, left inset, gap before the row. Rows are one line except the Next card and notes.
 local STYLE = {
   hero   = { font = "QuestTriageFontHero", icon = 26, x = 8, gap = 0 },
+  forecast = { font = "QuestTriageFontItem", x = 9, gap = 3 },
   note   = { font = "QuestTriageFontMeta", x = 8, gap = 3 },
-  header = { font = "QuestTriageFontHeader", x = 2, gap = 8 },
+  header = { font = "QuestTriageFontHeader", x = 7, gap = 5 },
   zone   = { font = "QuestTriageFontMeta", x = 6, gap = 2 },
   item   = { font = "QuestTriageFontItem", icon = 12, x = 6, gap = 1 },
   alert  = { font = "QuestTriageFontItem", icon = 12, x = 8, gap = 3 },
   more   = { font = "QuestTriageFontMeta", x = 24, gap = 0 },
+  routeStop = { font = "QuestTriageFontHeader", x = 8, gap = 4 },
+  routeStep = { font = "QuestTriageFontItem", x = 18, gap = 1 },
 }
 
 local heroRow -- the Next card, whose arrow follows your facing
 local faded = false
+-- One strip shared by the pooled rows. The unfilled track shows the gap to the next level.
+local xpTrack = CreateFrame("Frame", nil, content)
+xpTrack:SetHeight(3)
+xpTrack:EnableMouse(false)
+local trackBg = xpTrack:CreateTexture(nil, "BACKGROUND")
+trackBg:SetAllPoints()
+trackBg:SetColorTexture(0.18, 0.19, 0.21, 1)
+local earnedXP = xpTrack:CreateTexture(nil, "ARTWORK")
+earnedXP:SetPoint("BOTTOMLEFT")
+earnedXP:SetHeight(3)
+earnedXP:SetColorTexture(0.23, 0.55, 0.88, 1)
+local readyXP = xpTrack:CreateTexture(nil, "ARTWORK")
+readyXP:SetHeight(3)
+readyXP:SetColorTexture(0.68, 0.88, 1, 1)
 
 local function layout(specs)
+  local compact = QuestTriageDB.opts.compact
+  local width = compact and 300 or WIDTH
+  local contentWidth = width - (compact and 22 or 44)
+  frame:SetWidth(width)
+  content:SetWidth(contentWidth)
+  scroll:SetPoint("BOTTOMRIGHT", compact and -10 or -30, 10)
   local y = 0
+  xpTrack:Hide()
   heroRow = nil
   for i, s in ipairs(specs) do
     local st = STYLE[s.style] or STYLE.item
     local r = getRow(i)
     y = y + (i > 1 and st.gap or 0)
     r.kind, r.data, r.tip, r.loc, r.pin = s.kind, s.data, s.tip, s.loc, s.pin or s.icon
+    r.forecast = s.forecast
     r.questID, r.drop, r.yards, r.retry = s.questID, s.drop, s.yards or (s.loc and s.loc.yards), s.retry
     r.pinQuestID, r.thenLoc, r.thenTitle = s.pinQuestID, s.thenLoc, s.thenTitle
     r.saved, r.qlevel, r.hearth, r.skips = s.saved, s.qlevel, s.hearth, s.skips
@@ -401,19 +478,23 @@ local function layout(specs)
     end
 
     local isHero = s.style == "hero"
+    local isHeader, isForecast = s.style == "header", s.style == "forecast"
+    local inset = (isHeader or isForecast) and 4 or 2
     local rightW = (s.right and RIGHT_W + 4 or 0) + (s.progress and BAR_W + 6 or 0) + ((isHero and r.loc) and 40 or 0)
     r.text:SetFontObject(st.font)
     r.text:ClearAllPoints()
-    r.text:SetPoint("TOPLEFT", left, isHero and -7 or -2)
-    r.text:SetWidth(CONTENT_W - left - rightW - 4)
-    r.text:SetWordWrap(isHero or s.style == "note" or s.style == "alert")
+    r.text:SetPoint("TOPLEFT", left, isHero and -7 or -inset)
+    r.text:SetWidth(contentWidth - left - rightW - 4)
+    r.text:SetWordWrap(not compact and (isHero or isForecast or s.style == "note" or s.style == "alert"
+      or s.style=="routeStop" or s.style=="routeStep"))
     r.text:SetText(s.text)
-    local h = r.text:GetStringHeight() + 4
+    local h = r.text:GetStringHeight() + 2 * inset
 
     if isHero and s.sub then
       r.sub:ClearAllPoints()
       r.sub:SetPoint("TOPLEFT", r.text, "BOTTOMLEFT", 0, -3)
-      r.sub:SetWidth(CONTENT_W - left - rightW - 4)
+      r.sub:SetWidth(contentWidth - left - rightW - 4)
+      r.sub:SetWordWrap(not compact)
       r.sub:SetText(s.sub)
       r.sub:Show()
       h = h + r.sub:GetStringHeight() + 3
@@ -424,7 +505,7 @@ local function layout(specs)
     if isHero and s.checklist then
       r.list:ClearAllPoints()
       r.list:SetPoint("TOPLEFT", r.sub:IsShown() and r.sub or r.text, "BOTTOMLEFT", 0, -4)
-      r.list:SetWidth(CONTENT_W - left - rightW - 4)
+      r.list:SetWidth(contentWidth - left - rightW - 4)
       r.list:SetText(table.concat(s.checklist, "\n"))
       r.list:Show()
       h = h + r.list:GetStringHeight() + 4
@@ -432,7 +513,6 @@ local function layout(specs)
       r.list:Hide()
     end
     if isHero then h = math.max(h + 10, 44) end
-    if s.style == "header" then h = h + 2 end
 
     if st.icon and r.icon:IsShown() then
       r.icon:SetPoint(isHero and "LEFT" or "TOPLEFT", st.x, isHero and 0 or -((h - st.icon) / 2))
@@ -446,38 +526,64 @@ local function layout(specs)
     else
       r.bar:Hide()
     end
-    r.line:SetShown(s.style == "header")
+    r.line:SetShown(isHeader)
+    r.accent:SetShown(isHero or isForecast)
+    r.bg:SetShown(isHero or isForecast or isHeader)
     if isHero then
-      r.bg:SetAllPoints()
-      r.bg:SetColorTexture(1, 0.82, 0, 0.06)
-      r.bg:Show()
+      r.accent:SetColorTexture(1, 0.79, 0.2, 0.95)
+      r.bg:SetColorTexture(0.14, 0.11, 0.06, 0.88)
       heroRow = r.loc and r or nil
-    else
-      r.bg:Hide()
+    elseif isForecast then
+      local f = s.forecast
+      local width = contentWidth - 12
+      local earned = width * f.earned / f.cap
+      local ready = width * math.min(f.needed, f.turnin.xp) / f.cap
+      xpTrack:SetParent(r)
+      xpTrack:ClearAllPoints()
+      xpTrack:SetPoint("BOTTOMLEFT", r, "BOTTOMLEFT", 8, 0)
+      xpTrack:SetWidth(width)
+      earnedXP:SetWidth(earned)
+      earnedXP:SetShown(earned > 0)
+      readyXP:SetPoint("BOTTOMLEFT", xpTrack, "BOTTOMLEFT", earned, 0)
+      readyXP:SetWidth(ready)
+      readyXP:SetShown(ready > 0)
+      xpTrack:Show()
+      r.accent:SetColorTexture(0.48, 0.74, 0.93, 0.95)
+      r.bg:SetColorTexture(0.07, 0.12, 0.16, 0.88)
+    elseif isHeader then
+      r.bg:SetColorTexture(0.12, 0.12, 0.13, 0.9)
     end
     r.arrow:SetShown(isHero and r.loc ~= nil)
 
     r:ClearAllPoints()
     r:SetPoint("TOPLEFT", 0, -y)
-    r:SetSize(CONTENT_W, h)
+    r:SetSize(contentWidth, h)
     r.interactive = s.kind ~= nil or s.questID ~= nil
     r:EnableMouse(r.interactive)
-    if r.interactive then r:SetMouseClickEnabled(not faded) end
+    r:SetMouseMotionEnabled(not faded and (r.interactive or r.tip ~= nil or r.forecast ~= nil))
+    if r.interactive then
+      r:SetMouseClickEnabled(not faded)
+    end
     r:Show()
     y = y + h
   end
   for i = #specs + 1, #rows do rows[i]:Hide() end
-  content:SetHeight(y + 10)
+  content:SetHeight(compact and y or y + 10)
   -- Grow with the content, up to 60% of the screen; scroll after that.
-  frame:SetHeight(math.min(y + 50, UIParent:GetHeight() * 0.6))
+  frame:SetHeight(compact and 90 or math.min(y + 50, UIParent:GetHeight() * 0.6))
 end
 
 -- The Next card's arrow points where to walk, relative to the way you face.
 local arrowElapsed = 0
 frame:SetScript("OnUpdate", function(_, elapsed)
   arrowElapsed = arrowElapsed + elapsed
-  if arrowElapsed < 0.05 or not heroRow then return end
+  if arrowElapsed < 0.05 then return end
   arrowElapsed = 0
+  if hoveredForecast and hoveredForecast.forecast and GameTooltip:IsOwned(hoveredForecast)
+      and not InCombatLockdown() and hoveredForecast.forecastExpanded ~= IsShiftKeyDown() then
+    showForecast(hoveredForecast)
+  end
+  if not heroRow then return end
   local angle, facing = QT.AngleTo(heroRow.loc), GetPlayerFacing()
   if angle and facing then
     heroRow.arrow:SetRotation(angle - facing)
@@ -492,8 +598,15 @@ local function setFaded(on)
   faded = on and QuestTriageDB.opts.fadeInCombat
   frame:SetAlpha(faded and 0.3 or 1)
   frame:SetMouseClickEnabled(not faded)
+  for _, button in ipairs({ close, gear, help, compactBtn, scroll }) do
+    button:SetMouseClickEnabled(not faded)
+    button:SetMouseMotionEnabled(not faded)
+  end
   for _, r in ipairs(rows) do
-    if r.interactive then r:SetMouseClickEnabled(not faded) end
+    r:SetMouseMotionEnabled(not faded and (r.interactive or r.tip ~= nil or r.forecast ~= nil))
+    if r.interactive then
+      r:SetMouseClickEnabled(not faded)
+    end
   end
 end
 
@@ -569,15 +682,23 @@ local tracks = {}
 local function trackProgress(q, now)
   local t = tracks[q.questID] or { gains = {} }
   tracks[q.questID] = t
-  local value = 0
-  for _, o in ipairs(q.objectives or {}) do value = value + (o.have or 0) end
+  local value, required = 0, 0
+  for _, o in ipairs(q.objectives or {}) do
+    value, required = value + (o.have or 0), required + (o.need or 0)
+  end
   if t.value and value > t.value then table.insert(t.gains, now) end
   t.value = value
   while t.gains[1] and t.gains[1] < now - 900 do table.remove(t.gains, 1) end
   local there = q.inArea or (q.loc and q.loc.yards and q.loc.yards <= 300)
   if there then
     t.leftAt = nil
-    t.enteredAt = t.enteredAt or now
+    if not t.enteredAt or value < (t.initial or 0) then t.initial, t.enteredAt = value, now end
+    local elapsed, gained = now - t.enteredAt, value - t.initial
+    if gained >= 2 and elapsed >= 60 and required > value then
+      q.secondsLeft = (required - value) * elapsed / gained
+      q.pace = L["%d/%d · ~%d min left"]:format(value, required, math.ceil(q.secondsLeft / 60))
+      q.campRate = L["%d objective credits in %d min"]:format(gained, math.floor(elapsed / 60))
+    end
   elseif t.enteredAt then
     -- Stepping out for a moment doesn't reset the clock; leaving for 90 seconds does.
     t.leftAt = t.leftAt or now
@@ -605,6 +726,22 @@ function QT.Render()
     end
   end
   local buckets = QT.Triage(quests, player)
+  QT.UpdatePace(pace, player.level, player.xp, player.xpMax, now)
+  local forecast, ready = QT.QuestForecast(buckets, player)
+  local rate, average, eta = QT.LevelPace(pace, now)
+  local speed = rate and L["%s XP/hr"]:format(QT.Commas(rate))
+  local arrival = eta and L["Level %d in ~%d min"]:format(player.level + 1, eta)
+  levelStats = {}
+  local canLevel = not GameRulesUtil.IsPlayerAtEffectiveMaxLevel() and not IsXPUserDisabled()
+  if canLevel then
+    if forecast then table.insert(levelStats, forecast) end
+    if arrival then table.insert(levelStats, arrival) end
+    if speed then table.insert(levelStats, speed) end
+    if average then table.insert(levelStats, L["Session: %s XP/hr"]:format(QT.Commas(average))) end
+    for _, q in ipairs(quests) do
+      if q.pace then table.insert(levelStats, q.title .. " · " .. q.campRate .. " · " .. q.pace) end
+    end
+  end
 
   -- Remember the first advice given for each quest, to score it later.
   local history = QuestTriageCharDB.history
@@ -649,7 +786,21 @@ function QT.Render()
   compactBtn:SetText(QuestTriageDB.opts.compact and "+" or "-")
   sub:SetText(L["Level %d"]:format(player.level) .. (pct and string.format(" · %d%%", pct) or "")
     .. (power.nextSpells and (" · " .. L["spells at %d"]:format(power.nextSpells)) or ""))
-  local pickups = QT.ReadPickups()
+  title:SetShown(not QuestTriageDB.opts.compact)
+  sub:ClearAllPoints()
+  if QuestTriageDB.opts.compact then
+    local stat = QuestTriageDB.opts.stat
+    local display = ready and forecast or (stat == "quests" and forecast) or (stat == "speed" and speed) or arrival
+    sub:SetPoint("TOPLEFT", frame, "TOPLEFT", 12, -11)
+    sub:SetText(canLevel and display or (L["Level %d"]:format(player.level) .. (pct and (" · " .. pct .. "%") or "")))
+  else
+    sub:SetPoint("LEFT", title, "RIGHT", 8, 0)
+  end
+  sub:SetPoint("RIGHT", compactBtn, "LEFT", -4, 0)
+  sub:SetWordWrap(false)
+  sub:SetJustifyH("LEFT")
+  local powerMode = QuestTriageDB.opts.style == "power"
+  local pickups = QT.ReadPickups(powerMode)
   -- A quest you can start from your bags is shown as "Open <item>", not as a trip to where it drops.
   if pickups and power.bagQuest then
     for i = #pickups, 1, -1 do
@@ -669,18 +820,42 @@ function QT.Render()
     hearth = QT.HearthTip(bind, QT.NearestTownsfolk("Innkeeper"), GetMinimapZoneText(), C_SpellBook.IsSpellKnown)
     if hearth and QuestTriageCharDB.hearthSkip[hearth.hearth] then hearth = nil end
   end
+  local plan
+  local closeToLevel=player.xpMax and player.xpMax>0 and player.xp>=player.xpMax*0.75
+  if (powerMode or ready or closeToLevel) and canLevel and not death and not InCombatLockdown() and not UnitOnTaxi("player") then
+    local origin = QT.PlayerLocation()
+    if origin then
+      local travel = QT.ReadTravel(origin)
+      plan = QT.BuildPowerPlan(player, buckets, pickups, origin, travel, not powerMode)
+      if plan and not plan.gap then QT.PlanTravelUnlock(plan, origin, travel) end
+      if powerMode then QT.UpdatePartyPlan(plan, quests, travel) end
+    end
+  elseif (powerMode or ready or closeToLevel) and canLevel and not death then
+    local previous=QT.activePlan
+    if previous and (not previous.gap or (previous.targetLevel==player.level+1 and previous.gap==player.xpMax-player.xp)) then
+      plan=previous
+    end
+  end
+  QT.activePlan = plan
+  if plan and plan.gap then
+    forecast,ready=QT.QuestForecast(buckets,player,false,plan)
+    levelStats[1]=forecast
+  end
   local specs = QT.BuildRows(buckets, player, power,
     { expanded = QuestTriageDB.expanded, style = QuestTriageDB.opts.style, timedFirst = QuestTriageDB.opts.timedFirst,
       committed = QuestTriageCharDB.committed, death = death, hearth = hearth, fight = QT.ReadTarget(), manaPct = QT.ReadManaPct(),
-      compact = QuestTriageDB.opts.compact },
+      compact = QuestTriageDB.opts.compact, canLevel = canLevel, plan = plan },
     pickups and QT.PickupGroups(pickups, player, hidden))
+  if QuestTriageDB.opts.compact and specs[1] and specs[1].planned and plan.gap then
+    sub:SetText(L["Level %d in ~%d min"]:format(plan.targetLevel or player.level+1,math.ceil(plan.seconds/60)))
+  end
   -- Remember the Next step so it stays Next until done (survives death and /reload).
   if specs[1] and specs[1].key then QuestTriageCharDB.committed = specs[1].key end
   -- Nothing while Questie is still starting up at login.
   local guide = QT.GuideState()
-  if guide == "missing" then
+  if not powerMode and guide == "missing" and not QuestTriageDB.opts.compact then
     table.insert(specs, { style = "note", text = L["Quests to pick up need Questie (installed and enabled)."] })
-  elseif guide == "incompatible" then
+  elseif not powerMode and guide == "incompatible" and not QuestTriageDB.opts.compact then
     table.insert(specs, { style = "note", text = L["This Questie version isn't supported: no quests to pick up."] })
   end
   QT.lastSpecs = specs
@@ -825,7 +1000,8 @@ local function registerOptions()
   style:SetValueChangedCallback(function() QT.Render() end)
   Settings.CreateDropdown(category, style, function()
     local c = Settings.CreateControlTextContainer()
-    c:Add("batch", L["Batch (fastest)"], L["Pick up every quest near you before leaving a town, and do quests whose objectives are close together in one trip."])
+    c:Add("power", L["Power Leveling"], L["Automatically plan quests and travel as you play. Expand the panel for every stop."])
+    c:Add("batch", L["Batch by hub"], L["Pick up every quest near you before leaving a town, and do quests whose objectives are close together in one trip."])
     c:Add("single", L["One at a time"], L["Finish one quest, hand it in, then pick up the next."])
     return c:GetData()
   end, L["How Quest Triage plans your route."])
@@ -846,6 +1022,16 @@ local function registerOptions()
   compactSetting = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_COMPACT", "compact", opts, Settings.VarType.Boolean,
     L["Compact panel"], DEFAULTS.compact)
   compactSetting:SetValueChangedCallback(function() QT.Render() end)
+  local stat = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_STAT", "stat", opts, Settings.VarType.String,
+    L["Compact leveling stat"], DEFAULTS.stat)
+  stat:SetValueChangedCallback(function() QT.Render() end)
+  Settings.CreateDropdown(category, stat, function()
+    local c = Settings.CreateControlTextContainer()
+    c:Add("eta", L["Time to level"])
+    c:Add("speed", L["XP per hour"])
+    c:Add("quests", L["Quests to level"])
+    return c:GetData()
+  end)
   Settings.CreateCheckbox(category, compactSetting, L["Show only the Next step and its notes, without the quest lists. The - and + buttons on the panel do the same."])
 
   local lock = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_LOCKED", "locked", opts, Settings.VarType.Boolean,
@@ -920,23 +1106,24 @@ local function noteOffered(event)
   requestRender()
 end
 
-for _, e in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE", "PLAYER_LEVEL_UP",
+for _, e in ipairs({ "ADDON_LOADED", "PLAYER_ENTERING_WORLD", "QUEST_LOG_UPDATE", "PLAYER_LEVEL_UP", "PLAYER_XP_UPDATE", "GROUP_ROSTER_UPDATE", "TAXIMAP_OPENED", "CHAT_MSG_ADDON",
   "PLAYER_EQUIPMENT_CHANGED", "QUEST_ACCEPTED", "QUEST_TURNED_IN", "QUEST_REMOVED", "BAG_UPDATE_DELAYED",
   "UPDATE_INVENTORY_DURABILITY", "ZONE_CHANGED_NEW_AREA", "TRAINER_SHOW", "TRAINER_UPDATE",
   "PLAYER_REGEN_DISABLED", "PLAYER_REGEN_ENABLED", "PLAYER_DEAD", "PLAYER_ALIVE", "PLAYER_UNGHOST",
   "PLAYER_TARGET_CHANGED", "PLAYER_INSIDE_QUEST_BLOB_STATE_CHANGED", "MERCHANT_SHOW", "HEARTHSTONE_BOUND", "GOSSIP_SHOW", "QUEST_GREETING", "QUEST_COMPLETE" }) do
   frame:RegisterEvent(e)
 end
-frame:SetScript("OnEvent", function(self, event, arg1, arg2)
+frame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
   if event == "ADDON_LOADED" then
     if arg1 ~= addonName then return end
     QuestTriageDB = QuestTriageDB or { shown = true }
     QuestTriageDB.expanded = QuestTriageDB.expanded or {}
     QuestTriageDB.opts = QuestTriageDB.opts or {}
-    for k, v in pairs(DEFAULTS) do
-      if QuestTriageDB.opts[k] == nil then QuestTriageDB.opts[k] = v end
-    end
+    QT.InitializeOptions(QuestTriageDB.opts,DEFAULTS)
     QuestTriageCharDB = QuestTriageCharDB or {}
+    QuestTriageCharDB.travel = QuestTriageCharDB.travel or { known={}, routes={}, times={} }
+    QT.TrackTaxi()
+    C_ChatInfo.RegisterAddonMessagePrefix("QTLevel1")
     QuestTriageCharDB.history = QuestTriageCharDB.history or {}
     QuestTriageCharDB.levels = QuestTriageCharDB.levels or {}
     QuestTriageCharDB.hidden = QuestTriageCharDB.hidden or {}
@@ -957,8 +1144,17 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
   end
   if not QuestTriageCharDB then return end
   local history = QuestTriageCharDB.history
-  if event == "PLAYER_ENTERING_WORLD" then
+  if event == "CHAT_MSG_ADDON" then
+    QT.ReceivePartyPlan(arg1,arg2,arg3,arg4)
+  elseif event == "TAXIMAP_OPENED" then
+    QT.NoteTaxiMap()
+    requestRender()
+  elseif event == "PLAYER_ENTERING_WORLD" then
     if QuestTriageDB.shown ~= false then QT.SetShown(true) end
+    setFaded(InCombatLockdown())
+    requestRender()
+  elseif event == "PLAYER_XP_UPDATE" then
+    QT.UpdatePace(pace, UnitLevel("player"), UnitXP("player"), UnitXPMax("player"), time())
     requestRender()
   elseif event == "GOSSIP_SHOW" or event == "QUEST_GREETING" then
     noteOffered(event)
@@ -979,17 +1175,21 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2)
     setFaded(true)
   elseif event == "PLAYER_REGEN_ENABLED" then
     setFaded(false)
+    requestRender()
   elseif event == "QUEST_ACCEPTED" then
     history[arg1] = { accepted = time(), acceptedLevel = UnitLevel("player") }
     QuestTriageCharDB.hidden[arg1] = nil -- skipped as a pickup but taken after all (shared by a friend): show it
     requestRender()
   elseif event == "QUEST_TURNED_IN" then
+    -- A chain completion can make a quest available at a giver already visited this level.
+    QuestTriageCharDB.notOffered = {}
     local h = history[arg1] or {}
     history[arg1] = h
     h.result, h.finished, h.xp = "done", time(), arg2
-    session.done, session.xp = session.done + 1, session.xp + (arg2 or 0)
+    session.done = session.done + 1
     requestRender()
   elseif event == "QUEST_REMOVED" then
+    tracks[arg1] = nil
     -- Also fires on hand-in; if no hand-in was recorded within a second, it was abandoned.
     C_Timer.After(1, function()
       local h = history[arg1]
@@ -1033,11 +1233,31 @@ SLASH_QUESTTRIAGE1 = "/qt"
 SLASH_QUESTTRIAGE2 = "/questtriage"
 SlashCmdList.QUESTTRIAGE = function(msg)
   msg = string.lower(msg or "")
-  if msg == "reset" then
+  if msg == "power" then
+    QuestTriageDB.opts.style = "power"
+    QT.SetShown(true)
+    QT.Render()
+    print("|cffffd100Quest Triage:|r " .. L["Power Leveling"])
+  elseif msg == "route" then
+    QT.ShowCopyWindow(L["Power Leveling"], QT.RouteOverview(QT.activePlan))
+  elseif msg == "route bands" then
+    QT.ShowCopyWindow(L["Power Leveling"], QT.RouteBands())
+  elseif msg:match("^route %d+$") then
+    local level = tonumber(msg:match("%d+"))
+    if level >= 1 and level <= 60 and not InCombatLockdown() then
+      QT.ShowCopyWindow(L["Power Leveling"], QT.PreviewBand(level))
+    end
+  elseif msg == "party on" or msg == "party off" then
+    QuestTriageCharDB.sharePlan = msg == "party on"
+    QT.ResetPartyPlan()
+    print("|cffffd100Quest Triage:|r " .. (QuestTriageCharDB.sharePlan and L["Party route sharing enabled."] or L["Party route sharing disabled."]))
+  elseif msg == "reset" then
     QuestTriageDB.pos = nil
     defaultPos()
     QT.SetShown(true)
   elseif msg == "stats" then
+    QT.Render()
+    for _, line in ipairs(levelStats) do print("|cffffd100Quest Triage:|r " .. line) end
     for _, line in ipairs(QT.FormatStats(QT.Stats(QuestTriageCharDB.history))) do
       print("|cffffd100Quest Triage:|r " .. line)
     end
