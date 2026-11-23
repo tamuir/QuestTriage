@@ -246,7 +246,7 @@ function QT.ExtendRoute(plan, jobs, travel, gap)
   for _, job in ipairs(plan.jobs) do take(job) end
   local more = {steps={}, jobs={}, seconds=0, xp=0, gap=gap}
   local at, used, xp = plan.at, plan.used, plan.xp
-  -- shortcut: greedy and capped at 12 trips to stay cheap on the 2 s refresh; raise the cap if routes stop short.
+  -- Cap the greedy search at 12 trips to bound the work per refresh.
   for _ = 1, 12 do
     if xp >= gap then break end
     local best

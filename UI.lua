@@ -846,6 +846,7 @@ local function trackProgress(q, now)
   if q.slow then q.altLoc = QT.BetterSpot(q.questID) end
 end
 
+local lastOrigin, lastRefresh, lastGuide
 function QT.Render()
   local player = QT.ReadPlayer()
   local hidden = QuestTriageCharDB.hidden
@@ -919,6 +920,7 @@ function QT.Render()
   end
   QT.lastQuests = quests
   if not frame:IsShown() then return end
+  lastOrigin, lastRefresh = QT.PlayerLocation(), GetTime()
   local power = QT.ReadPower(player.level)
   local pct = player.xpMax and player.xpMax > 0 and math.floor(player.xp / player.xpMax * 100)
   compactBtn:SetText(QuestTriageDB.opts.compact and "+" or "-")
@@ -961,7 +963,7 @@ function QT.Render()
   local plan
   local closeToLevel=player.xpMax and player.xpMax>0 and player.xp>=player.xpMax*0.75
   if (powerMode or ready or closeToLevel) and canLevel and not death and not InCombatLockdown() and not UnitOnTaxi("player") then
-    local origin = QT.PlayerLocation()
+    local origin = lastOrigin
     if origin then
       local travel = QT.ReadTravel(origin)
       plan = QT.BuildPowerPlan(player, buckets, pickups, origin, travel, not powerMode)
@@ -1001,6 +1003,7 @@ function QT.Render()
   if specs[1] and specs[1].key then QuestTriageCharDB.committed = specs[1].key end
   -- Nothing while Questie is still starting up at login.
   local guide = QT.GuideState()
+  lastGuide = guide
   if not powerMode and guide == "missing" and not QuestTriageDB.opts.compact then
     table.insert(specs, { style = "note", text = L["Quests to pick up need Questie (installed and enabled)."] })
   elseif not powerMode and guide == "incompatible" and not QuestTriageDB.opts.compact then
@@ -1010,7 +1013,7 @@ function QT.Render()
   layout(specs)
 end
 
--- How long each refresh takes, for /qt debug: decide from real numbers whether the 2-second refresh needs splitting.
+-- Time full refreshes for /qt debug.
 local perf = { runs = 0, last = 0, max = 0, total = 0 }
 local render = QT.Render
 function QT.Render()
@@ -1120,7 +1123,25 @@ function QT.ShowCopyWindow(title, text)
   copyWindow.edit:HighlightText()
 end
 
--- Distances change as you move: refresh every 2 seconds while the panel is open.
+-- Events refresh the quest log and route. Between events, check pins promptly and
+-- replan after 100 yards. A slower refresh keeps timers, cooldowns and party data current.
+local pending = false
+local function panelTick()
+  if pending then return end
+  QT.CheckArrival()
+  local age = GetTime() - lastRefresh
+  local sharing = QuestTriageCharDB.sharePlan and IsInGroup() and not IsInRaid()
+  if age >= (sharing and 10 or 30) or (lastGuide == "loading" and QT.GuideState() ~= lastGuide) then
+    QT.Render()
+    return
+  end
+  local here = QT.PlayerLocation()
+  if here and (not lastOrigin or here.uiMapId ~= lastOrigin.uiMapId
+      or (age >= 6 and QT.LegDistance(here, lastOrigin) >= 100)) then
+    QT.Render()
+  end
+end
+
 local ticker
 function QT.SetShown(shown)
   QuestTriageDB.shown = shown
@@ -1130,7 +1151,7 @@ function QT.SetShown(shown)
     -- A position saved by an older version is held by its centre: re-anchor it by the top once.
     if QuestTriageDB.pos and QuestTriageDB.pos[1] ~= "TOPLEFT" then anchorTop() end
     QT.Render()
-    ticker = C_Timer.NewTicker(2, function() QT.Render() end)
+    ticker = C_Timer.NewTicker(2, panelTick)
   else
     frame:Hide()
   end
@@ -1227,7 +1248,6 @@ end
 
 -- Re-render at most twice a second; QUEST_LOG_UPDATE and BAG_UPDATE_DELAYED fire a lot.
 -- Runs even while hidden so the advice history stays complete.
-local pending = false
 local function requestRender()
   if pending or not QuestTriageCharDB then return end
   pending = true
@@ -1298,9 +1318,8 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
     QT.NoteTaxiMap()
     requestRender()
   elseif event == "PLAYER_ENTERING_WORLD" then
-    if QuestTriageDB.shown ~= false then QT.SetShown(true) end
+    if QuestTriageDB.shown ~= false then QT.SetShown(true) else requestRender() end
     setFaded(InCombatLockdown())
-    requestRender()
   elseif event == "PLAYER_XP_UPDATE" then
     QT.UpdatePace(pace, UnitLevel("player"), UnitXP("player"), UnitXPMax("player"), time())
     requestRender()
