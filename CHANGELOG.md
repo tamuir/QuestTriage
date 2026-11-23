@@ -2,6 +2,10 @@
 
 ## [Unreleased]
 
+## [0.6.1] - 2026-11-23
+
+- Reduced periodic stutter from the open panel. Waypoint arrival checks still run every two seconds. Full quest and route refreshes follow game events, movement, and a slower timer for time-sensitive advice.
+
 ## [0.6.0] - 2026-11-20
 
 - Power Leveling: a new leveling style, now the default. It plans whole trips (pick up, objectives, travel, hand-in) from where you stand, using 970 bundled quests from levels 1–60, so it works with an empty quest log and without Questie. Profiles still on the old Batch default switch once; pick another style in Settings any time.
