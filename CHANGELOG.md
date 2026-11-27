@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.2] - 2026-11-27
+
 - New setting "Gear suggestions" (on by default): turn it off and Quest Triage no longer suggests equipping items from your bags, notes quests whose reward is an upgrade, or names the best reward in chat.
 - Fixed nearby quests dropping out of the route as "slow": the hunting clock ran anywhere within 300 yards of the quest marker, even at the quest giver. It now runs only inside the quest area.
 - Fixed quests whose helpers take an item you carry (The Warsong Reports): the helpers were hidden while you carried it, and named as the way to get it when you didn't. Power Leveling no longer counts their several stops as one short trip.
