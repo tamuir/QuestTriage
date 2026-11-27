@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+- The "Gear suggestions" setting is now "Equip suggestions" and only stops suggestions to equip items already in your bags. Quests whose reward is an upgrade, and the best-reward hint in chat, show again.
+
 ## [0.6.2] - 2026-11-27
 
 - New setting "Gear suggestions" (on by default): turn it off and Quest Triage no longer suggests equipping items from your bags, notes quests whose reward is an upgrade, or names the best reward in chat.

@@ -1233,9 +1233,9 @@ local function registerOptions()
   Settings.CreateCheckbox(category, hearthTips, L["When you're in a town far from where your hearthstone is set, suggest setting it at the inn there."])
 
   local gearTips = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_GEAR", "gearTips", opts, Settings.VarType.Boolean,
-    L["Gear suggestions"], DEFAULTS.gearTips)
+    L["Equip suggestions"], DEFAULTS.gearTips)
   gearTips:SetValueChangedCallback(function() QT.Render() end)
-  Settings.CreateCheckbox(category, gearTips, L["Suggest equipping upgrades from your bags, note quests whose reward is an upgrade, and name the best reward choice in chat."])
+  Settings.CreateCheckbox(category, gearTips, L["Suggest equipping upgrades that are already in your bags."])
 
   local openMap = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_OPENMAP", "openMap", opts, Settings.VarType.Boolean,
     L["Open the map when pinning"], DEFAULTS.openMap)
@@ -1348,7 +1348,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
     noteOffered(event)
   elseif event == "QUEST_COMPLETE" then
     -- The reward window: name the choice that's a clear upgrade. A hint only; the pick stays yours.
-    if QuestTriageDB.opts.gearTips and (GetNumQuestChoices() or 0) > 1 then
+    if (GetNumQuestChoices() or 0) > 1 then
       C_Timer.After(0.3, function() -- item stats can arrive a moment after the window opens
         local up = QT.BestRewardChoice()
         if up then print("|cffffd100Quest Triage:|r " .. L["Best reward for you: %s (%s)."]:format(up.link, QT.UpgradeNote(up))) end

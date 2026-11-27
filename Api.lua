@@ -127,7 +127,7 @@ local function upgradeOver(link)
 end
 
 local function better(a, b) return a and (not b or a.score > b.score) end
--- The "Gear suggestions" setting (on unless turned off).
+-- The "Equip suggestions" setting (on unless turned off). Quest rewards that are upgrades still show.
 local function gearTips() return not (QuestTriageDB and QuestTriageDB.opts and QuestTriageDB.opts.gearTips == false) end
 
 -- Best gear upgrade among a quest's rewards, or nil.
@@ -258,7 +258,7 @@ local function readModern(party)
           isFailed = C_QuestLog.IsFailed and C_QuestLog.IsFailed(id) or false,
           isTrivial = C_QuestLog.IsQuestTrivial and (C_QuestLog.IsQuestTrivial(id) == true),
           xp = GetQuestLogRewardXP and GetQuestLogRewardXP(id) or nil,
-          upgrade = gearTips() and QT.BestUpgrade(id) or nil,
+          upgrade = QT.BestUpgrade(id),
           objectives = {},
         }
         q.tagID, q.isElite = questTag(id)
