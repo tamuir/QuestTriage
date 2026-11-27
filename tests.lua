@@ -245,6 +245,10 @@ local blockedHere = QT.Triage({ q{ title = "Seed", level = 12, questID = 5, loc 
   blockers = { { text = "Pick up Stone", loc = at(400, 0, "Stone") } } } }, player)
 assert(QT.BestActions(blockedHere, {}, player)[1].text == "Pick up Stone first")
 
+-- Helper quests: one that takes the item you carry is still worth doing; one that gives it is not.
+assert(QT.HelperTakes({ [3] = { { 16746 } } }, { 16746 }), "The Warsong Reports: the Scout takes a report")
+assert(not QT.HelperTakes({ [3] = { { 1 } } }, { 16746 }) and not QT.HelperTakes({}, { 4986 }), "The Demon Seed: the stone gives it")
+
 -- Hunting areas: go to the nearest real hunting ground, not the nearest stray spawn (your Barrens raptors).
 local stray = { density = 1, dist = 80, loc = { name = "stray" } }
 local ground = { density = 14, dist = 900, loc = { name = "ground" } }

@@ -256,6 +256,17 @@ carryShard=false
 local hunt=false
 for _,s in ipairs(replay().steps) do if s.questID==5052 and s.icon=="objective" then hunt=true end end
 assert(hunt)
+-- The Warsong Reports: three helpers across the zone, one marker. Never priced as a single stop.
+local finisher=QT.QuestFinisher
+QT.QuestFinisher=function() return campB end
+local reports={questID=6543,title="The Warsong Reports",level=19,xp=1800,loc=camp,objectives={{text="x",have=0,need=3}}}
+local function routed()
+  return QT.BuildPowerPlan(player21,QT.Triage({reports},player21),{},camp,{speed=7,edges={}})
+end
+assert(routed().steps[1].questID==6543)
+reports.helpers=true
+assert(not routed())
+QT.QuestFinisher=finisher
 QT.GuideReady=originalGuide
 
 C_Map={GetMapInfo=function(id) return {name="Map"..id} end}

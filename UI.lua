@@ -22,7 +22,7 @@ end
 local FONTS = { metaFont, ownFont("QuestTriageFontHero", GameFontNormalMed3),
   ownFont("QuestTriageFontHeader", GameFontNormal), ownFont("QuestTriageFontItem", GameFontHighlightSmall) }
 
-local DEFAULTS = { style = "power", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true, openMap = true, timedFirst = 0, bgAlpha = QT.PANEL_BG[4], compact = true, stat = "eta" }
+local DEFAULTS = { style = "power", locked = false, scale = 1, fadeInCombat = true, autoSellJunk = true, hearthTips = true, gearTips = true, openMap = true, timedFirst = 0, bgAlpha = QT.PANEL_BG[4], compact = true, stat = "eta" }
 
 local frame = CreateFrame("Frame", "QuestTriageFrame", UIParent,
   BackdropTemplateMixin and "BackdropTemplate" or nil)
@@ -815,7 +815,7 @@ local function recordDeath()
   end
 end
 
--- Slow spawns: when you arrived near a quest's objectives, and each time its progress went up (this session).
+-- Slow spawns: when you entered a quest's area, and each time its progress went up (this session).
 local tracks = {}
 local function trackProgress(q, now)
   local t = tracks[q.questID] or { gains = {} }
@@ -827,7 +827,7 @@ local function trackProgress(q, now)
   if t.value and value > t.value then table.insert(t.gains, now) end
   t.value = value
   while t.gains[1] and t.gains[1] < now - 900 do table.remove(t.gains, 1) end
-  local there = q.inArea or (q.loc and q.loc.yards and q.loc.yards <= 300)
+  local there = q.inArea -- not "near the marker": the quest's own giver can stand within 200 yd of it
   if there then
     t.leftAt = nil
     if not t.enteredAt or value < (t.initial or 0) then t.initial, t.enteredAt = value, now end
@@ -1044,11 +1044,27 @@ function QT.Debug()
   for _, p in ipairs(mapID and C_QuestLog.GetQuestsOnMap(mapID) or {}) do blizz[p.questID] = p end
   local h = QT.lastSpecs and QT.lastSpecs[1]
   if h then table.insert(lines, "Next: " .. (h.text or "?") .. " | key " .. tostring(h.key) .. " | " .. fmtLoc(h.loc)) end
+  local player = QT.ReadPlayer()
+  table.insert(lines, string.format("Level %d, %s/%s XP | style %s | committed %s%s", player.level, QT.Commas(player.xp),
+    QT.Commas(player.xpMax), tostring(QuestTriageDB.opts.style), tostring(QuestTriageCharDB.committed),
+    InCombatLockdown() and " | in combat" or ""))
+  table.insert(lines, "Route: " .. QT.RouteOverview(QT.activePlan))
+  -- Why a quest is or isn't in the running: its bucket and everything that takes it off the route.
+  local function state(q)
+    local parts = { "level " .. tostring(q.level), (QT.Classify(q, player)), "XP " .. tostring(q.xp) }
+    if q.slow then table.insert(parts, "slow") end
+    if q.secondsLeft then table.insert(parts, string.format("pace %d s left", q.secondsLeft)) end
+    if q.deaths then table.insert(parts, string.format("%d deaths at %d", q.deaths.count, q.deaths.level)) end
+    if q.helpers then table.insert(parts, "several helper stops, not routed") end
+    if q.deferred then table.insert(parts, "saved for later") end
+    for _, b in ipairs(q.blockers or {}) do table.insert(parts, "needs: " .. b.text) end
+    return table.concat(parts, ", ")
+  end
   for _, q in ipairs(QT.lastQuests or {}) do
     local b = blizz[q.questID]
     local any = QT.BlizzardMarker(q.questID, q.zone)
-    table.insert(lines, string.format("[%s] %s%s%s | %s | Blizzard marker: %s | your or quest's zone map: %s", tostring(q.questID),
-      q.title or "?", q.isComplete and " (complete)" or "", q.inArea and " (you're in its area)" or "", fmtLoc(q.loc),
+    table.insert(lines, string.format("[%s] %s%s%s | %s | %s | Blizzard marker: %s | your or quest's zone map: %s", tostring(q.questID),
+      q.title or "?", q.isComplete and " (complete)" or "", q.inArea and " (you're in its area)" or "", state(q), fmtLoc(q.loc),
       b and string.format("%.1f, %.1f", b.x * 100, b.y * 100) or "none on this map",
       any and string.format("%s (map %s) %.1f, %.1f", any.zone or "?", tostring(any.uiMapId), any.x, any.y) or "none"))
   end
@@ -1100,7 +1116,7 @@ function QT.ShowCopyWindow(title, text)
     tinsert(UISpecialFrames, "QuestTriageCopyWindow") -- Esc closes it
     f.hint = f:CreateFontString(nil, "OVERLAY", "GameFontHighlightSmall")
     f.hint:SetPoint("TOPLEFT", 14, -30)
-    f.hint:SetText(L["Press Ctrl+C to copy, then paste it into your bug report. It holds your quest log and position, nothing else."])
+    f.hint:SetText(L["Press Ctrl+C to copy, then paste it into your bug report. It holds your level, XP, quest log, route and position, nothing else."])
     local s = CreateFrame("ScrollFrame", nil, f, "InputScrollFrameTemplate")
     s:SetPoint("TOPLEFT", 14, -50)
     s:SetPoint("BOTTOMRIGHT", -14, 14)
@@ -1216,6 +1232,11 @@ local function registerOptions()
   hearthTips:SetValueChangedCallback(function() QT.Render() end)
   Settings.CreateCheckbox(category, hearthTips, L["When you're in a town far from where your hearthstone is set, suggest setting it at the inn there."])
 
+  local gearTips = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_GEAR", "gearTips", opts, Settings.VarType.Boolean,
+    L["Gear suggestions"], DEFAULTS.gearTips)
+  gearTips:SetValueChangedCallback(function() QT.Render() end)
+  Settings.CreateCheckbox(category, gearTips, L["Suggest equipping upgrades from your bags, note quests whose reward is an upgrade, and name the best reward choice in chat."])
+
   local openMap = Settings.RegisterAddOnSetting(category, "QUESTTRIAGE_OPENMAP", "openMap", opts, Settings.VarType.Boolean,
     L["Open the map when pinning"], DEFAULTS.openMap)
   Settings.CreateCheckbox(category, openMap, L["Clicking a step opens the world map at its pin. Off: the pin is set quietly (map, minimap and navigation arrow)."])
@@ -1327,7 +1348,7 @@ frame:SetScript("OnEvent", function(self, event, arg1, arg2, arg3, arg4)
     noteOffered(event)
   elseif event == "QUEST_COMPLETE" then
     -- The reward window: name the choice that's a clear upgrade. A hint only; the pick stays yours.
-    if (GetNumQuestChoices() or 0) > 1 then
+    if QuestTriageDB.opts.gearTips and (GetNumQuestChoices() or 0) > 1 then
       C_Timer.After(0.3, function() -- item stats can arrive a moment after the window opens
         local up = QT.BestRewardChoice()
         if up then print("|cffffd100Quest Triage:|r " .. L["Best reward for you: %s (%s)."]:format(up.link, QT.UpgradeNote(up))) end

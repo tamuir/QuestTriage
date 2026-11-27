@@ -50,7 +50,7 @@ Works **with or without Questie**: a bundled catalog of 970 quests (levels 1–6
 
 ## Level faster and get stronger
 
-- **Gear upgrades** from quest rewards and your bags, judged on real stats for your class (never cloth for a Warrior). One click to equip. A two-hander has to beat your weapon and shield together, and right-click stops an item you don't want.
+- **Gear upgrades** from quest rewards and your bags, judged on real stats for your class (never cloth for a Warrior). One click to equip. A two-hander has to beat your weapon and shield together, right-click stops an item you don't want, and a setting turns gear suggestions off.
 - **Trainer spells** read from your spellbook: it tells you when new spells unlock, so no wasted trips.
 - **Learns from your deaths**: die twice on the same quest and it moves to Save for later.
 - **Death handling**: release, run back with the arrow, resurrect, carry on.

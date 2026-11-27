@@ -556,7 +556,8 @@ function QT.BuildPowerPlan(player, buckets, offers, origin, travel, goalOnly)
   if questie then
     for _,e in ipairs(buckets.now) do
       local q=e.quest
-      if q.questID and not QT.RouteQuests[q.questID] and not q.slow and not (q.blockers and q.blockers[1])
+      -- q.helpers: the marker shows one of several stops, so the trip can't be priced.
+      if q.questID and not QT.RouteQuests[q.questID] and not q.slow and not q.helpers and not (q.blockers and q.blockers[1])
           and q.loc and q.loc.wx and (q.xp or 0)>0 then
         local finish=QT.QuestFinisher(q.questID)
         if finish then

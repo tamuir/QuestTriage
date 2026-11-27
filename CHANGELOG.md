@@ -2,6 +2,11 @@
 
 ## [Unreleased]
 
+- New setting "Gear suggestions" (on by default): turn it off and Quest Triage no longer suggests equipping items from your bags, notes quests whose reward is an upgrade, or names the best reward in chat.
+- Fixed nearby quests dropping out of the route as "slow": the hunting clock ran anywhere within 300 yards of the quest marker, even at the quest giver. It now runs only inside the quest area.
+- Fixed quests whose helpers take an item you carry (The Warsong Reports): the helpers were hidden while you carried it, and named as the way to get it when you didn't. Power Leveling no longer counts their several stops as one short trip.
+- `/qt debug` shows your level, XP and route, and why each quest is or isn't in the running.
+
 ## [0.6.1] - 2026-11-23
 
 - Reduced periodic stutter from the open panel. Waypoint arrival checks still run every two seconds. Full quest and route refreshes follow game events, movement, and a slower timer for time-sensitive advice.

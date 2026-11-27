@@ -74,7 +74,7 @@ local function readClassic(party)
         q.xp = GetQuestLogRewardXP and GetQuestLogRewardXP(questID)
         q.inArea = not q.isComplete and C_Minimap and C_Minimap.IsInsideQuestBlob and C_Minimap.IsInsideQuestBlob(questID)
         q.loc = QT.QuestLocation(questID, q.isComplete, q.inArea, header)
-        if not q.isComplete then q.blockers = QT.QuestBlockers(questID) end
+        if not q.isComplete then q.blockers, q.helpers = QT.QuestBlockers(questID) end
       end
       local numObj = GetNumQuestLeaderBoards(i) or 0
       for j = 1, numObj do
@@ -127,6 +127,8 @@ local function upgradeOver(link)
 end
 
 local function better(a, b) return a and (not b or a.score > b.score) end
+-- The "Gear suggestions" setting (on unless turned off).
+local function gearTips() return not (QuestTriageDB and QuestTriageDB.opts and QuestTriageDB.opts.gearTips == false) end
 
 -- Best gear upgrade among a quest's rewards, or nil.
 function QT.BestUpgrade(questID)
@@ -174,7 +176,7 @@ function QT.ReadPower(level)
         end
         if info.quality == 0 and not info.hasNoValue then
           p.junk = p.junk + 1
-        elseif C_PlayerInfo.CanUseItem(info.itemID) and not QuestTriageCharDB.skipItems[info.itemID] then
+        elseif gearTips() and C_PlayerInfo.CanUseItem(info.itemID) and not QuestTriageCharDB.skipItems[info.itemID] then
           local up = upgradeOver(info.hyperlink, info.quality)
           if better(up, p.bagUpgrade) then p.bagUpgrade = up end
         end
@@ -256,7 +258,7 @@ local function readModern(party)
           isFailed = C_QuestLog.IsFailed and C_QuestLog.IsFailed(id) or false,
           isTrivial = C_QuestLog.IsQuestTrivial and (C_QuestLog.IsQuestTrivial(id) == true),
           xp = GetQuestLogRewardXP and GetQuestLogRewardXP(id) or nil,
-          upgrade = QT.BestUpgrade(id),
+          upgrade = gearTips() and QT.BestUpgrade(id) or nil,
           objectives = {},
         }
         q.tagID, q.isElite = questTag(id)
@@ -264,7 +266,7 @@ local function readModern(party)
         local total, elapsed = C_QuestLog.GetTimeAllowed(id)
         if not q.isFailed and total and elapsed and elapsed < total then q.timeLeft = total - elapsed end
         if not q.isComplete then
-          q.blockers = QT.QuestBlockers(id)
+          q.blockers, q.helpers = QT.QuestBlockers(id)
           -- The game's own quest area (white boundary on the minimap): are you standing in it?
           q.inArea = C_Minimap and C_Minimap.IsInsideQuestBlob and C_Minimap.IsInsideQuestBlob(id) or nil
         end

@@ -517,6 +517,17 @@ QT.SLOW_RATE = 240
 QT.SLOW_PENALTY = 800 -- a slow spot costs as much as walking 800 yd, so nearby work goes first
 -- Spawn areas (from Guide.lua): { {loc, density = spawn points in and around it, dist = yards from you}, ... }
 
+-- Does a helper quest take one of the items you carry (The Warsong Reports) instead of giving it (The Demon Seed)?
+-- objectives = the helper's, as Questie stores them: [3] = { {itemID}, ... }.
+function QT.HelperTakes(objectives, items)
+  for _, o in ipairs(objectives and objectives[3] or {}) do
+    for _, item in ipairs(items) do
+      if o[1] == item then return true end
+    end
+  end
+  return false
+end
+
 -- Where to hunt: the nearest area with real density. A lone stray spawn at the edge of a zone is ignored;
 -- quests with only a few spawns (named mobs) can use any of them. Returns an area or nil.
 function QT.PickHuntingArea(list)

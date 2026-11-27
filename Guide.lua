@@ -336,6 +336,7 @@ local helperNotNeeded = {}
 -- items the quest needs you to carry (requiredSourceItems) and helper quests it hands you (childQuests).
 -- Carrying every required item means nothing is missing.
 -- Returns { {text, how, loc}, ... } or nil. how says what to do there ("Click the Flawed Power Stone").
+-- Second value: true when helpers take an item you carry, so the quest has more stops than its marker shows.
 function QT.QuestBlockers(questID)
   if not load() then return nil end
   local ok, items = pcall(M.DB.QueryQuestSingle, questID, "requiredSourceItems")
@@ -348,13 +349,19 @@ function QT.QuestBlockers(questID)
   end
   -- Helper quests are only worth picking up while this quest still needs what they give.
   local satisfied = #items > 0 and #missing == 0
-  for _, c in ipairs(children) do helperNotNeeded[c] = satisfied or nil end
-  if satisfied then return nil end
+  local takes, helpers = {}, nil
+  for _, c in ipairs(children) do
+    local okO, objectives = pcall(M.DB.QueryQuestSingle, c, "objectives")
+    takes[c] = okO and type(objectives) == "table" and QT.HelperTakes(objectives, items)
+    helpers = takes[c] or helpers
+    helperNotNeeded[c] = satisfied and not takes[c] or nil
+  end
+  if satisfied then return nil, helpers end
 
   local out = {}
   -- A helper quest not yet picked up is the usual way to get the item.
   for _, c in ipairs(children) do
-    if not C_QuestLog.IsQuestFlaggedCompleted(c) and not C_QuestLog.GetLogIndexForQuestID(c) then
+    if not takes[c] and not C_QuestLog.IsQuestFlaggedCompleted(c) and not C_QuestLog.GetLogIndexForQuestID(c) then
       local okq, child = pcall(M.DB.GetQuest, c)
       if okq and child then
         local loc = cached("help:" .. c, function() return withHow(helperStart(child)) end, L["helper quest giver"])
@@ -370,7 +377,7 @@ function QT.QuestBlockers(questID)
         loc = loc })
     end
   end
-  return out[1] and out or nil
+  return out[1] and out or nil, helpers
 end
 
 -- Do you carry every item the quest asks you to bring (or needs to start)? Darkmoon Faire hand-ins
