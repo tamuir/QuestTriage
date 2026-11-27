@@ -2,6 +2,8 @@
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-27
+
 - The "Gear suggestions" setting is now "Equip suggestions" and only stops suggestions to equip items already in your bags. Quests whose reward is an upgrade, and the best-reward hint in chat, show again.
 
 ## [0.6.2] - 2026-11-27
